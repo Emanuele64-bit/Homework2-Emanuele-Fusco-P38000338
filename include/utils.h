@@ -230,7 +230,7 @@ inline Eigen::MatrixXd weightedPseudoInverse(const Eigen::MatrixXd &W,
 
 inline Eigen::MatrixXd gradientJointLimits(const Eigen::VectorXd &q, const Eigen::MatrixXd &jntLimits, double &costValue)
 {
-    int n = q.size();
+    unsigned int n = q.size();
     costValue = 0;
     double gamma = 1.0;
     Eigen::VectorXd gradient;
