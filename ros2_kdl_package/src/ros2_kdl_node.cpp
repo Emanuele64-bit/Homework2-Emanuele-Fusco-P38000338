@@ -30,7 +30,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 {
     public:
         Iiwa_pub_sub()
-        : Node("ros2_kdl_node"), 
+        : Node("ros2_kdl_node"),
         node_handle_(std::shared_ptr<Iiwa_pub_sub>(this))
         {
             // declare cmd_interface parameter
@@ -38,7 +38,7 @@ class Iiwa_pub_sub : public rclcpp::Node
             declare_parameter("traj_duration", 5.0);
             declare_parameter("acc_duration", 1.0);
             declare_parameter("total_time", 10.0);
-            declare_parameter("trajectory_len", 500);
+            declare_parameter("trajectory_len", 500.0);
             declare_parameter("Kp", 1.5);
             declare_parameter("end_position", std::vector<double>{0.25, 0.0, 0.35});
 
@@ -67,6 +67,57 @@ class Iiwa_pub_sub : public rclcpp::Node
             {
                 RCLCPP_INFO(get_logger(),"Selected s type is not valid!"); return;
             }
+
+            // declare traj_type parameter
+            get_parameter("traj_duration", traj_duration);
+            RCLCPP_INFO(get_logger(),"Current trajectory duration is: '%f'", traj_duration);
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
+
+            // declare  parameter 
+            get_parameter("acc_duration", acc_duration);
+            RCLCPP_INFO(get_logger(),"Current acceleration duration is: '%f'", acc_duration);
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
+
+            // declare traj_type parameter 
+            get_parameter("total_time", total_time);
+            RCLCPP_INFO(get_logger(),"Current total time is: '%f'", total_time);
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
+
+            // declare traj_type parameter
+            get_parameter("trajectory_len", trajectory_len);
+            RCLCPP_INFO(get_logger(),"Current trajectory length is: '%f'", trajectory_len);
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
+
+            // declare traj_type parameter
+            get_parameter("Kp", Kp);
+            RCLCPP_INFO(get_logger(),"Current Kp is: '%f'", Kp);
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
+
+            // declare traj_type parameter
+            get_parameter("end_position", end_position);
+            RCLCPP_INFO(get_logger(),"Current end_position is:");
+            for(int i=0; i<3; i++){
+                RCLCPP_INFO(get_logger(),"1: %f", end_position[i]);
+            }
+            // if (!(traj_type_ == "linear" || traj_trajectorytype_ == "circular"))
+            // {
+            //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
+            // }
 
             iteration_ = 0; t_ = 0;
             joint_state_available_ = false; 
@@ -209,6 +260,7 @@ class Iiwa_pub_sub : public rclcpp::Node
             cmdPublisher_->publish(cmd_msg);
 
             RCLCPP_INFO(this->get_logger(), "Starting trajectory execution ...");
+
         }
 
     private:
@@ -397,12 +449,12 @@ class Iiwa_pub_sub : public rclcpp::Node
         std::string s_type_;
         
         //Adding parameters
-        std::string traj_duration;
-        std::string acc_duration;
-        std::string total_time;
-        std::string trajectory_len;
-        std::string Kp;
-        std::string end_position;
+        double traj_duration;
+        double acc_duration;
+        double total_time;
+        double trajectory_len;
+        double Kp;
+        std::vector<double> end_position;
 
         KDL::Frame init_cart_pose_;
 };
@@ -413,5 +465,5 @@ int main( int argc, char** argv )
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<Iiwa_pub_sub>());
     rclcpp::shutdown();
-    return 1;
+    return 0;
 }
