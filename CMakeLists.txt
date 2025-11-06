@@ -14,10 +14,7 @@ find_package(kdl_parser REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(iiwa_bringup REQUIRED)
 
 add_executable(ros2_kdl_node src/ros2_kdl_node.cpp src/kdl_robot.cpp src/kdl_planner.cpp src/kdl_control.cpp)
 target_include_directories(ros2_kdl_node PUBLIC
@@ -51,10 +48,8 @@ ament_target_dependencies(ros2_kdl_node_example
 install(TARGETS ros2_kdl_node_example
   DESTINATION lib/${PROJECT_NAME})
 
-install(DIRECTORY
-config # included for point 2c: containing the armando_controllers.yaml
-launch
-DESTINATION share/${PROJECT_NAME}
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

@@ -19,8 +19,8 @@ public:
                            double _Kd);
 
     Eigen::VectorXd velocity_control_null(KDL::Frame &_desPos,
-                           KDL::Twist &_desVel,
-                           KDL::Twist &_desAcc,
+                        //    KDL::Twist &_desVel,
+                        //    KDL::Twist &_desAcc,
                            double _Kpp);
 
 private:
