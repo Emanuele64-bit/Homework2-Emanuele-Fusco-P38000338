@@ -31,6 +31,7 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
     // Stato
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
     const int n = q.size();
+    // unsigned int m = robot_->getNrJnts();
 
     // Errore di posizione (solo traslazione)
     KDL::Frame cartpos = robot_->getEEFrame();
@@ -54,7 +55,6 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
 
     const double lambda = 1e-3;
 
-    // unsigned int m = robot_->getNrJnts();
     Eigen::VectorXd gradient;
     gradient.resize(n);
     
