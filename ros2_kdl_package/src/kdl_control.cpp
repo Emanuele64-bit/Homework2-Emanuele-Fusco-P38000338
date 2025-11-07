@@ -24,21 +24,20 @@ Eigen::VectorXd KDLController::idCntr(KDL::JntArray &_qd,
 }
 
 Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
-                                                    // KDL::Twist &_desVel,
-                                                    // KDL::Twist &_desAcc,
-                                                    double Kpp)
+                                                    //  KDL::Twist &_desVel,
+                                                    //  KDL::Twist &_desAcc,
+                                                     double Kpp)
 {
     // Stato
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
     const int n = q.size();
 
-    // Errore di posizione (solo traslazione)
+    //Errore di posizione (solo traslazione)
     KDL::Frame cartpos = robot_->getEEFrame();
     KDL::Vector d = _desPos.p - cartpos.p;
     Eigen::Vector3d e_p(d.x(), d.y(), d.z());        // 3×1
 
-
-    // Jacobiano (6×n) e parte lineare (3×n)
+    // Jacobiana (6×n) e parte lineare (3×n)
     KDL::Jacobian J_kdl = robot_->getEEJacobian();
     Eigen::MatrixXd J6 = J_kdl.data;    //Eigen::MatrixXd J_dag = J.completeOrthogonalDecomposition().pseudoInverse();
 
@@ -48,22 +47,18 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
     Eigen::MatrixXd J_dag = J.transpose()*(J*J.transpose()).inverse();
 
 
+
     // Limiti
+
     Eigen::MatrixXd limits = robot_->getJntLimits();
     Eigen::VectorXd qmin = limits.col(0);
     Eigen::VectorXd qmax = limits.col(1);
 
-
     const double lambda = 100;
 
+    //unsigned int m = robot_->getNrJnts();
     Eigen::VectorXd gradient;
     gradient.resize(n);
-
-    std::cout << "J_dag: " << J_dag.rows() << "x" << J_dag.cols() << std::endl;
-    std::cout << "J: " << J.rows() << "x" << J.cols() << std::endl;
-    std::cout << "e_p: " << e_p.size() << std::endl;
-   
-
     
     for(unsigned int i = 0; i < n; i++) {
         if (q(i,0) < qmin(i) || q(i,0) > qmax(i)) {
@@ -75,12 +70,8 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
     q0_dot = gradient; 
     Eigen::VectorXd q_dot = J_dag*Kpp*e_p +(I-J_dag*J)*q0_dot;
 
+
+
     return q_dot;
 }
-
-
-
-    
-
-
 

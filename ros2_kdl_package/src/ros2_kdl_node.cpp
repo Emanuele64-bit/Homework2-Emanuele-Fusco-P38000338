@@ -37,7 +37,7 @@ class Iiwa_pub_sub : public rclcpp::Node
             declare_parameter("cmd_interface", "position"); 
             declare_parameter("traj_duration", 5.0);
             declare_parameter("acc_duration", 1.0);
-            declare_parameter("total_time", 10.0);
+            declare_parameter("total_time", 2.0);
             declare_parameter("trajectory_len", 500.0);
             declare_parameter("Kp", 1.5);
             declare_parameter("end_position", std::vector<double>{0.25, 0.0, 0.35});
@@ -47,7 +47,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             if (!(cmd_interface_ == "position" || cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "effort" || cmd_interface_ == "velocity_ctrl_null"))
             {
-                RCLCPP_ERROR(get_logger(),"Selected cmd interface is not valid! Use 'position', 'velocity_ctrl', 'effort', 'velocity_ctrl_null' instead..."); return;
+                RCLCPP_ERROR(get_logger(),"Selected cmd interface is not valid! Use 'position', 'velocity_ctrl', 'effort' or 'velocity_ctrl_null' instead..."); return;
             }
 
             // declare traj_type parameter (linear, circular)
@@ -119,29 +119,8 @@ class Iiwa_pub_sub : public rclcpp::Node
             //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
             // }
 
-            // double end_pos_x = end_position[0];
-            // double end_pos_y = end_position[1];
-            // double end_pos_z = end_position[2];
-
-            // RCLCPP_INFO(get_logger(),"Current cmd interface is: '%s'", cmd_interface_.c_str());
-            // RCLCPP_INFO(get_logger(),
-            //             "Loaded parameters:\n"
-            //             "  traj_duration: %.2f\n"
-            //             "  acc_duration: %.2f\n"
-            //             "  total_time: %.2f\n"
-            //             "  trajectory_len: %f\n"
-            //             "  Kp: %.2f\n"
-            //             "  end_position: [%.3f, %.3f, %.3f]",
-            //                 traj_duration,
-            //                 acc_duration,
-            //                 total_time,
-            //                 trajectory_len,
-            //                 Kp,
-            //                 end_pos_x,
-            //                 end_pos_y,
-            //                 end_pos_z);
-
-            iteration_ = 0; t_ = 0;
+            iteration_ = 0; 
+            t_ = 0;
             joint_state_available_ = false; 
 
             // retrieve robot_description param
@@ -172,7 +151,8 @@ class Iiwa_pub_sub : public rclcpp::Node
             joint_velocities_.resize(nj); 
             joint_positions_cmd_.resize(nj); 
             joint_velocities_cmd_.resize(nj); 
-            joint_efforts_cmd_.resize(nj); joint_efforts_cmd_.data.setZero();
+            joint_efforts_cmd_.resize(nj); 
+            joint_efforts_cmd_.data.setZero();
 
             // Subscriber to jnt states
             jointSubscriber_ = this->create_subscription<sensor_msgs::msg::JointState>(
@@ -204,22 +184,13 @@ class Iiwa_pub_sub : public rclcpp::Node
             // Initialize controller
             KDLController controller_(*robot_);
 
-            RCLCPP_INFO(get_logger(),"Current OLD end_position is:");
-            for(int i=0; i<3; i++){
-                RCLCPP_INFO(get_logger(),"1: %f", end_position[i]);
-            }
-
             // EE's trajectory initial position (just an offset)
             Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data) - Eigen::Vector3d(0,0,0.1));
 
             // EE's trajectory end position (just opposite y)
             Eigen::Vector3d end_position_; 
-            end_position_ << end_position[0], end_position[1], end_position[2];
 
-            RCLCPP_INFO(get_logger(),"Current NEW end_position is:");
-            for(int i=0; i<3; i++){
-                RCLCPP_INFO(get_logger(),"1: %f", end_position_[i]);
-            }
+            end_position_ << end_position[0], -end_position[1], end_position[2];
 
             // Plan trajectory
             double traj_duration = 1.5, acc_duration = 0.5, traj_radius = 0.15;
@@ -264,7 +235,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     desired_commands_[i] = joint_positions_(i);
                 }
             }
-            else if(cmd_interface_ == "velocity_ctrl"){
+            else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
                 timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
@@ -285,19 +256,11 @@ class Iiwa_pub_sub : public rclcpp::Node
                 for (long int i = 0; i < joint_efforts_cmd_.data.size(); ++i) {
                     desired_commands_[i] = joint_efforts_cmd_(i);
                 }
-            }
-            
-            else if(cmd_interface_ == "velocity_ctrl_null"){
-                // Create cmd publisher
-                cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
-                timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
-                                            std::bind(&Iiwa_pub_sub::cmd_publisher, this));
-            
-                // Set joint velocity commands
-                for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
-                    desired_commands_[i] = joint_velocities_(i);
-                }
-            }
+            }  
+
+
+
+
 
             // Create msg and publish
             std_msgs::msg::Float64MultiArray cmd_msg;
@@ -312,8 +275,10 @@ class Iiwa_pub_sub : public rclcpp::Node
 
         void cmd_publisher(){
 
-            KDLController controller_(*robot_);
             iteration_ = iteration_ + 1;
+
+            KDLController controller_(*robot_);
+
 
             // define trajectory
             double total_time = 1.5; // 
@@ -358,7 +323,9 @@ class Iiwa_pub_sub : public rclcpp::Node
                 KDL::Frame cartpos = robot_->getEEFrame();           
 
                 // Compute desired Frame
-                KDL::Frame desFrame; desFrame.M = cartpos.M; desFrame.p = toKDL(p_.pos); 
+                KDL::Frame desFrame; 
+                desFrame.M = cartpos.M; 
+                desFrame.p = toKDL(p_.pos); 
 
                 // compute errors
                 Eigen::Vector3d error = computeLinearError(p_.pos, Eigen::Vector3d(cartpos.p.data));
@@ -378,13 +345,13 @@ class Iiwa_pub_sub : public rclcpp::Node
                     Vector6d cartvel; cartvel << p_.vel + Kp*error, o_error;
                     joint_velocities_cmd_.data = pseudoinverse(robot_->getEEJacobian().data)*cartvel;
                 }
-
-                else if(cmd_interface_ == "velocity_ctrl_null"){
-                    // Compute differential IK
-                    joint_velocities_cmd_.data = controller_.velocity_control_null(desFrame, Kp); ;
-                }
                 else if(cmd_interface_ == "effort"){
                     joint_efforts_cmd_.data[0] = 0.1*std::sin(2*M_PI*t_/total_time);
+                }
+                else if(cmd_interface_ == "velocity_ctrl_null"){ 
+                    std::cout << "Running velocity control null." << std::endl;
+                
+                    joint_velocities_cmd_.data = controller_.velocity_control_null(desFrame, Kp);
                 }
 
                 // Update KDLrobot structure
@@ -509,6 +476,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
         KDL::Frame init_cart_pose_;
 };
+
 
  
 int main( int argc, char** argv )

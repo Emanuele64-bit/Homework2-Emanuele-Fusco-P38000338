@@ -228,6 +228,8 @@ inline Eigen::MatrixXd weightedPseudoInverse(const Eigen::MatrixXd &W,
     return W.inverse()*Mat.transpose()*(Mat*W.inverse()*Mat.transpose()).inverse();
 }
 
+
+
 inline Eigen::MatrixXd gradientJointLimits(const Eigen::VectorXd &q, const Eigen::MatrixXd &jntLimits, double &costValue)
 {
     int n = q.size();

@@ -21,10 +21,10 @@ def generate_launch_description():
 
     cmd_interface = DeclareLaunchArgument(
         name='cmd_interface',
-        description = 'Select a type of controller',
-        default_value='velocity_ctrl'
+        description = 'Select type of controller',
+        default_value='velocity_ctrl',
     )
-    cmd_interface = LaunchConfiguration("cmd_interface")
+    ctrl = LaunchConfiguration("cmd_interface")
 
     #### Launch ####
 
@@ -36,40 +36,39 @@ def generate_launch_description():
     # }.items(),
     # )
 
+
     # iiwa_launch = IncludeLaunchDescription(
     #     PathJoinSubstitution(
     #         [FindPackageShare('iiwa_bringup'), 'launch', 'iiwa.launch.py']),
     #      launch_arguments={
-    #         #'gui': LaunchConfiguration('gui'),
-    #         'pause': 'true',
+    #     #     'gui': LaunchConfiguration('gui'),
+    #          'pause': 'true',
     #         'gz_args': ['-r ', 'empty.sdf'],
     #     }.items(),
     # )
 
-    #### Nodes ####
-
-    # push robot_description to factory and spawn robot in gazebo
+    # # push robot_description to factory and spawn robot in gazebo
     # urdf_spawner_node = Node(
     #     package='ros_gz_sim',
     #     executable='create',
     #     name='urdf_spawner',
-    #     arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0.0', '-unpause'],
+    #     arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0', '-unpause'],
     #     output='screen',
     # )
+
+    #### Nodes ####
 
     ros2_kdl_node = Node(
         package='ros2_kdl_package',
         executable='ros2_kdl_node',
-        name='ros2_kdl_node',
         output='screen',
-        parameters=[params, {'cmd_interface': cmd_interface}]
+        parameters=[params, {'cmd_interface': ctrl}]
     )
-
 
     # List of Arguments and Nodes
     return LaunchDescription([
-        #iiwa_launch,
-        #empty_world_launch,
-        #urdf_spawner_node,
+        # iiwa_launch,
+        # empty_world_launch,
         ros2_kdl_node,
+        # urdf_spawner_node
     ])
