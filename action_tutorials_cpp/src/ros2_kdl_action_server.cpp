@@ -42,36 +42,37 @@ private:
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
   {
-    RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->order);
-    (void)uuid;
+    RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->/*????*/);
+
+    (void)uuid; // marcalo come usato
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
 
   rclcpp_action::CancelResponse handle_cancel(
-    const std::shared_ptr<GoalHandleFibonacci> goal_handle)
+    const std::shared_ptr<GoalHandleTraj> goal_handle)
   {
     RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
-    (void)goal_handle;
+    (void)goal_handle; // marcalo come usato
     return rclcpp_action::CancelResponse::ACCEPT;
   }
 
-  void handle_accepted(const std::shared_ptr<GoalHandleFibonacci> goal_handle)
+  void handle_accepted(const std::shared_ptr<GoalHandleTraj> goal_handle)
   {
     using namespace std::placeholders;
     // this needs to return quickly to avoid blocking the executor, so spin up a new thread
-    std::thread{std::bind(&FibonacciActionServer::execute, this, _1), goal_handle}.detach();
+    std::thread{std::bind(&Ros2kdlActionServer::execute, this, _1), goal_handle}.detach(); // not joinable
   }
 
-  void execute(const std::shared_ptr<GoalHandleFibonacci> goal_handle)
+  void execute(const std::shared_ptr<GoalHandleTraj> goal_handle)
   {
     RCLCPP_INFO(this->get_logger(), "Executing goal");
     rclcpp::Rate loop_rate(1);
     const auto goal = goal_handle->get_goal();
-    auto feedback = std::make_shared<Fibonacci::Feedback>();
-    auto & sequence = feedback->partial_sequence;
-    sequence.push_back(0);
-    sequence.push_back(1);
-    auto result = std::make_shared<Fibonacci::Result>();
+    auto feedback = std::make_shared<ExecuteLinearTrajectory::Feedback>();
+    auto & e_norm = feedback->error_norm;
+    e_norm.push_back(0);
+    // sequence.push_back(1);
+    auto result = std::make_shared<ExecuteLinearTrajectory::Result>();
 
     for (int i = 1; (i < goal->order) && rclcpp::ok(); ++i) {
       // Check if there is a cancel request
@@ -92,7 +93,7 @@ private:
 
     // Check if goal is done
     if (rclcpp::ok()) {
-      result->sequence = sequence;
+      result->final_error_norm = error_norm;
       goal_handle->succeed(result);
       RCLCPP_INFO(this->get_logger(), "Goal succeeded");
     }
@@ -101,4 +102,4 @@ private:
 
 }  // namespace action_tutorials_cpp
 
-RCLCPP_COMPONENTS_REGISTER_NODE(action_tutorials_cpp::FibonacciActionServer)
+RCLCPP_COMPONENTS_REGISTER_NODE(action_tutorials_cpp::Ros2kdlActionServer)
