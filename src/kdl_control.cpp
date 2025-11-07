@@ -63,7 +63,7 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
             std::cout << "joint " << i << " limits violated. Value = "<< q(i,0)*180.0/M_PI << "\n"; 
         }
             gradient(i,0) = 1.0/lambda * std::pow((qmax(i) - qmin(i)),2)* (2*q(i,0) - qmax(i) - qmin(i))/(std::pow((qmax(i)-q(i,0)),2)*std::pow((q(i,0)-qmin(i)),2));
-        } 
+    } 
     Eigen::VectorXd q0_dot; 
     q0_dot = gradient; 
     Eigen::VectorXd q_dot = J*Kpp*e_p +(I-J_dag*J)*q0_dot;
