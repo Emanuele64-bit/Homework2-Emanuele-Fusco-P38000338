@@ -27,27 +27,26 @@ def generate_launch_description():
     }.items(),
     )
 
-
     iiwa_launch = IncludeLaunchDescription(
         PathJoinSubstitution(
             [FindPackageShare('iiwa_bringup'), 'launch', 'iiwa.launch.py']),
          launch_arguments={
         #     'gui': LaunchConfiguration('gui'),
-             'pause': 'true',
+            'pause': 'true',
             'gz_args': ['-r ', 'empty.sdf'],
         }.items(),
     )
+
+    #### Nodes ####
 
     # push robot_description to factory and spawn robot in gazebo
     urdf_spawner_node = Node(
         package='ros_gz_sim',
         executable='create',
         name='urdf_spawner',
-        arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0.5', '-unpause'],
+        arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0.0', '-unpause'],
         output='screen',
     )
-
-    #### Nodes ####
 
     ros2_kdl_node = Node(
         package='ros2_kdl_package',
@@ -61,6 +60,6 @@ def generate_launch_description():
     return LaunchDescription([
         iiwa_launch,
         empty_world_launch,
+        urdf_spawner_node,
         ros2_kdl_node,
-        urdf_spawner_node
     ])
