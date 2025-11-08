@@ -10,6 +10,13 @@
 #include <chrono>
 #include <cstdlib>
 #include <memory>
+// additional include inspired by action tutorial
+#include <functional>
+#include <thread>
+#include "ros2_kdl_action_interface/action/ros2kdl.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "rclcpp_components/register_node_macro.hpp"
+#include "action_tutorials_cpp/visibility_control.h"
 
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -34,8 +41,7 @@ using GoalHandleTraj = rclcpp_action::ServerGoalHandle<ExecuteLinearTrajectory>;
 class Iiwa_pub_sub : public rclcpp::Node
 {
     public:
-    //ACTION_TUTORIALS_CPP_BUILDING_DLL
-
+        //ACTION_TUTORIALS_CPP_BUILDING_DLL
         Iiwa_pub_sub()
         : Node("ros2_kdl_node"),
         node_handle_(std::shared_ptr<Iiwa_pub_sub>(this))
@@ -130,9 +136,9 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/velocity_controller/commands", 10);
             joint_sub_ = create_subscription<sensor_msgs::msg::JointState>(
-            "/joint_states", 10,
-            std::bind(&KdlLinearTrajActionServer::on_joint_state, this, std::placeholders::_1));
-
+                            "/joint_states", 
+                            10,
+                            std::bind(&KdlLinearTrajActionServer::on_joint_state, this, std::placeholders::_1));
 
             iteration_ = 0; 
             t_ = 0;
@@ -171,7 +177,9 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // Subscriber to jnt states
             jointSubscriber_ = this->create_subscription<sensor_msgs::msg::JointState>(
-                "/joint_states", 10, std::bind(&Iiwa_pub_sub::joint_state_subscriber, this, std::placeholders::_1));
+                "/joint_states", 
+                10, 
+                std::bind(&Iiwa_pub_sub::joint_state_subscriber, this, std::placeholders::_1));
 
             // Wait for the joint_state topic
             while(!joint_state_available_){
@@ -202,9 +210,8 @@ class Iiwa_pub_sub : public rclcpp::Node
             // EE's trajectory initial position (just an offset)
             Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data) - Eigen::Vector3d(0,0,0.1));
 
-            // EE's trajectory end position (just opposite y)
+            // EE's trajectory end position (just opposite y). Taken by yaml file
             Eigen::Vector3d end_position_; 
-
             end_position_ << end_position[0], -end_position[1], end_position[2];
 
             // Plan trajectory
@@ -233,7 +240,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                 }
             }
 
-
+            // Create an action server
             this->action_server_ = rclcpp_action::create_server<ExecuteLinearTrajectory>(
                 this,
                 "ros2kdl",
@@ -283,53 +290,52 @@ class Iiwa_pub_sub : public rclcpp::Node
             }  
 
 
-
-
-
             // Create msg and publish
             std_msgs::msg::Float64MultiArray cmd_msg;
             cmd_msg.data = desired_commands_;
             cmdPublisher_->publish(cmd_msg);
 
             RCLCPP_INFO(this->get_logger(), "Starting trajectory execution ...");
-
         }
 
     private:
 
         rclcpp_action::Server<Ros2kdlActionServer>::SharedPtr action_server_;
 
-        rclcpp_action::GoalResponse handle_goal(
-        const rclcpp_action::GoalUUID & uuid,
-        std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
-
+        rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid,
+                                                std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
         {
+            if (traj_type_ != "linear") {
+                RCLCPP_WARN(get_logger(), "traj_type != linear, ma procedo (userò linear)");
+            }
+            if (end_pos_.size() < 3) {
+                RCLCPP_ERROR(get_logger(), "Param 'end_position' ha dimensione < 3");
+                return rclcpp_action::GoalResponse::REJECT;
+            }
+            if (traj_duration_ <= 0.0 || acc_duration_ < 0.0 || acc_duration_ > traj_duration_/2.0) {
+                RCLCPP_ERROR(get_logger(), "Parametri tempo non validi (T=%.3f, Ta=%.3f)", traj_duration_, acc_duration_);
+                return rclcpp_action::GoalResponse::REJECT;
+            }
 
-    if (traj_type_ != "linear") {
-      RCLCPP_WARN(get_logger(), "traj_type != linear, ma procedo (userò linear)");
-    }
-    if (end_pos_.size() < 3) {
-      RCLCPP_ERROR(get_logger(), "Param 'end_position' ha dimensione < 3");
-      return rclcpp_action::GoalResponse::REJECT;
-    }
-    if (traj_duration_ <= 0.0 || acc_duration_ < 0.0 || acc_duration_ > traj_duration_/2.0) {
-      RCLCPP_ERROR(get_logger(), "Parametri tempo non validi (T=%.3f, Ta=%.3f)", traj_duration_, acc_duration_);
-      return rclcpp_action::GoalResponse::REJECT;
-    }
+            //RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->/*????*/);
 
-    //RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->/*????*/);
+                (void)uuid; // marcalo come usato
+                return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+        }
 
-    (void)uuid; // marcalo come usato
-    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-    }
+        rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleTraj> goal_handle)
+        {
+            RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
+            (void)goal_handle; // marcalo come usato
+            return rclcpp_action::CancelResponse::ACCEPT;
+        }
 
-    rclcpp_action::CancelResponse handle_cancel(
-        const std::shared_ptr<GoalHandleTraj> goal_handle)
-    {
-        RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
-        (void)goal_handle; // marcalo come usato
-        return rclcpp_action::CancelResponse::ACCEPT;
-    }
+        void handle_accepted(const std::shared_ptr<GoalHandleFibonacci> goal_handle)
+        {
+            using namespace std::placeholders;
+            // this needs to return quickly to avoid blocking the executor, so spin up a new thread
+            std::thread{std::bind(&FibonacciActionServer::execute, this, _1), goal_handle}.detach();
+        }
 
         void cmd_publisher(){
 
