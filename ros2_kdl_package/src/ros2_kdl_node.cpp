@@ -319,14 +319,14 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             //RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->/*????*/);
 
-                (void)uuid; // marcalo come usato
-                return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+            (void)uuid; 
+            return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
         }
 
         rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleTraj> goal_handle)
         {
             RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
-            (void)goal_handle; // marcalo come usato
+            (void)goal_handle; 
             return rclcpp_action::CancelResponse::ACCEPT;
         }
 
