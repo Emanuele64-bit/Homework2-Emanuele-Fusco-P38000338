@@ -1,0 +1,11 @@
+# Goal
+# (vuoto: la traiettoria proviene dai parametri del nodo)
+
+---
+# Result
+float32 final_error_norm
+string message
+
+---
+# Feedback
+float32 error_norm

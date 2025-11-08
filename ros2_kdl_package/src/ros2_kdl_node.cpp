@@ -26,9 +26,16 @@ using namespace KDL;
 using FloatArray = std_msgs::msg::Float64MultiArray;
 using namespace std::chrono_literals;
 
+using ExecuteLinearTrajectory = ros2_kdl_package::action::Ros2kdl;
+using GoalHandleTraj = rclcpp_action::ServerGoalHandle<ExecuteLinearTrajectory>;
+
+//namespace action_tutorials_cpp
+
 class Iiwa_pub_sub : public rclcpp::Node
 {
     public:
+    //ACTION_TUTORIALS_CPP_BUILDING_DLL
+
         Iiwa_pub_sub()
         : Node("ros2_kdl_node"),
         node_handle_(std::shared_ptr<Iiwa_pub_sub>(this))
@@ -118,6 +125,14 @@ class Iiwa_pub_sub : public rclcpp::Node
             // {
             //     RCLCPP_INFO(get_logger(),"Selected traj type is not valid!"); return;
             // }
+
+            using namespace std::placeholders;
+
+            cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/velocity_controller/commands", 10);
+            joint_sub_ = create_subscription<sensor_msgs::msg::JointState>(
+            "/joint_states", 10,
+            std::bind(&KdlLinearTrajActionServer::on_joint_state, this, std::placeholders::_1));
+
 
             iteration_ = 0; 
             t_ = 0;
@@ -217,6 +232,15 @@ class Iiwa_pub_sub : public rclcpp::Node
                     p_ = planner_.circular_traj_cubic(t_);
                 }
             }
+
+
+            this->action_server_ = rclcpp_action::create_server<ExecuteLinearTrajectory>(
+                this,
+                "ros2kdl",
+                std::bind(&Ros2kdlActionServer::handle_goal, this, _1, _2),
+                std::bind(&Ros2kdlActionServer::handle_cancel, this, _1),
+                std::bind(&Ros2kdlActionServer::handle_accepted, this, _1));
+
             // // Retrieve the first trajectory point
             // trajectory_point p = planner_.compute_trajectory(t);
 
@@ -272,6 +296,40 @@ class Iiwa_pub_sub : public rclcpp::Node
         }
 
     private:
+
+        rclcpp_action::Server<Ros2kdlActionServer>::SharedPtr action_server_;
+
+        rclcpp_action::GoalResponse handle_goal(
+        const rclcpp_action::GoalUUID & uuid,
+        std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
+
+        {
+
+    if (traj_type_ != "linear") {
+      RCLCPP_WARN(get_logger(), "traj_type != linear, ma procedo (userò linear)");
+    }
+    if (end_pos_.size() < 3) {
+      RCLCPP_ERROR(get_logger(), "Param 'end_position' ha dimensione < 3");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+    if (traj_duration_ <= 0.0 || acc_duration_ < 0.0 || acc_duration_ > traj_duration_/2.0) {
+      RCLCPP_ERROR(get_logger(), "Parametri tempo non validi (T=%.3f, Ta=%.3f)", traj_duration_, acc_duration_);
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    //RCLCPP_INFO(this->get_logger(), "Received goal request with order %d", goal->/*????*/);
+
+    (void)uuid; // marcalo come usato
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
+
+    rclcpp_action::CancelResponse handle_cancel(
+        const std::shared_ptr<GoalHandleTraj> goal_handle)
+    {
+        RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
+        (void)goal_handle; // marcalo come usato
+        return rclcpp_action::CancelResponse::ACCEPT;
+    }
 
         void cmd_publisher(){
 
