@@ -53,3 +53,6 @@ Finally, in another terminal launch the client node:
 ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity_ctrl_null node:=client
 ```
 > :mag:**Note:** by deafault the position controller and the server node are selected.
+
+## :earth_africa: Gazebo world
+

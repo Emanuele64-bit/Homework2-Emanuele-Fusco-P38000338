@@ -17,6 +17,19 @@ def generate_launch_description():
     # Params: containing the robot description
     params = os.path.join(pkg_path, 'config', 'param.yaml')
 
+    # aruco_path = get_package_share_directory('iiwa_description')
+    # aruco_params = os.path.join(aruco_path, 'gazebo/world', 'empty.world')
+
+    # models_path = PathJoinSubstitution([
+    # FindPackageShare('ros2_iiwa'),
+    # 'iiwa_description', 'gazebo', 'models'
+    # ])
+
+    # SetEnvironmentVariable(
+    # name='GZ_SIM_RESOURCE_PATH',
+    # value=[EnvironmentVariable('GZ_SIM_RESOURCE_PATH', default_value=''), ':', models_path]
+    # )
+
     #### Arguments ####
 
     cmd_interface = DeclareLaunchArgument(
@@ -35,35 +48,44 @@ def generate_launch_description():
 
     #### Launch ####
 
-    # empty_world_launch = IncludeLaunchDescription(
-    # PathJoinSubstitution([FindPackageShare('ros_gz_sim'), 'launch', 'gz_sim.launch.py']),
-    # launch_arguments={
-    #     'pause': 'true',
-    #     'gz_args': ['-r ', 'empty.sdf'],
-    # }.items(),
-    # )
+    empty_world_launch = IncludeLaunchDescription(
+    PathJoinSubstitution([FindPackageShare('ros_gz_sim'), 'launch', 'gz_sim.launch.py']),
+    launch_arguments={
+        'pause': 'false',
+        'gz_args': ['-r ', 'empty.sdf'],
+    }.items(),
+    )
 
 
-    # iiwa_launch = IncludeLaunchDescription(
-    #     PathJoinSubstitution(
-    #         [FindPackageShare('iiwa_bringup'), 'launch', 'iiwa.launch.py']),
-    #      launch_arguments={
-    #     #     'gui': LaunchConfiguration('gui'),
-    #          'pause': 'true',
-    #         'gz_args': ['-r ', 'empty.sdf'],
-    #     }.items(),
-    # )
+    iiwa_launch = IncludeLaunchDescription(
+        PathJoinSubstitution(
+            [FindPackageShare('iiwa_bringup'), 'launch', 'iiwa.launch.py']),
+         launch_arguments={
+        #     'gui': LaunchConfiguration('gui'),
+            'pause': 'false',
+            'gz_args': ['-r ', 'empty.sdf'],
+        }.items(),
+    )
 
-    # # push robot_description to factory and spawn robot in gazebo
-    # urdf_spawner_node = Node(
-    #     package='ros_gz_sim',
-    #     executable='create',
-    #     name='urdf_spawner',
-    #     arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0', '-unpause'],
-    #     output='screen',
-    # )
+    aruco_launch = IncludeLaunchDescription(
+        PathJoinSubstitution([
+            FindPackageShare('aruco_ros'), 'launch', 'single.launch.py'
+        ]),
+        launch_arguments={
+            # parametri necessari per aruco_ros
+        }.items(),
+    )
 
     #### Nodes ####
+
+    # push robot_description to factory and spawn robot in gazebo
+    urdf_spawner_node = Node(
+        package='ros_gz_sim',
+        executable='create',
+        name='urdf_spawner',
+        arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0.0', '-unpause'],
+        output='screen',
+    )
 
     ros2_kdl_node = Node(
         package='ros2_kdl_package',
@@ -85,9 +107,10 @@ def generate_launch_description():
     return LaunchDescription([
         node_to_start,
         cmd_interface,
-        # iiwa_launch,
-        # empty_world_launch,
         ros2_kdl_node,
         ros2_kdl_client_node,
-        # urdf_spawner_node
+        iiwa_launch,
+        empty_world_launch,
+        urdf_spawner_node,
+        aruco_launch
     ])
