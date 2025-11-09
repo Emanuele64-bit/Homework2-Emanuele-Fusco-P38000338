@@ -43,13 +43,13 @@ Then, launch the iiwa robot in Rviz:
 ros2 launch iiwa_bringup iiwa.launch.py command_interface:="velocity" robot_controller:="velocity_controller"
 ```
 
-Now, open another ROS 2 workspace, run the server `ros2_kdl_node` and specify the type of the controller by using the `cmd_interface` argument:
+Now, open another ROS 2 workspace, launch the server `ros2_kdl_node` through the `node` argument and specify the type of the controller by using the `cmd_interface` argument:
 ```sh
-ros2 run ros2_kdl_package ros2_kdl_node.py --ros-args -p cmd_interface:=velocity_ctrl_null
+ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity_ctrl_null node:=server
 ```
 
-Finally, in another terminal run the client node:
+Finally, in another terminal launch the client node:
 ```sh
-ros2 run ros2_kdl_package ros2_kdl_client_node
+ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity_ctrl_null node:=client
 ```
-> :warning:**Warning:** the launch file has to be modify.
+> :mag:**Note:** by deafault the position controller and the server node are selected.

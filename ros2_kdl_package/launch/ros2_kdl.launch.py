@@ -26,6 +26,13 @@ def generate_launch_description():
     )
     ctrl = LaunchConfiguration("cmd_interface")
 
+    node_to_start = DeclareLaunchArgument(
+        name='node',
+        description = 'Select the node to start',
+        default_value='server',
+    )
+    node = LaunchConfiguration("node")
+
     #### Launch ####
 
     # empty_world_launch = IncludeLaunchDescription(
@@ -62,13 +69,25 @@ def generate_launch_description():
         package='ros2_kdl_package',
         executable='ros2_kdl_node',
         output='screen',
-        parameters=[params, {'cmd_interface': ctrl}]
+        parameters=[{'cmd_interface': ctrl}],
+        condition=IfCondition(PythonExpression(["'", node, "' == 'server'"]))
+    )
+
+    ros2_kdl_client_node = Node(
+        package='ros2_kdl_package',
+        executable='ros2_kdl_client_node',
+        output='screen',
+        parameters=[params],
+        condition=IfCondition(PythonExpression(["'", node, "' == 'client'"]))
     )
 
     # List of Arguments and Nodes
     return LaunchDescription([
+        node_to_start,
+        cmd_interface,
         # iiwa_launch,
         # empty_world_launch,
         ros2_kdl_node,
+        ros2_kdl_client_node,
         # urdf_spawner_node
     ])
