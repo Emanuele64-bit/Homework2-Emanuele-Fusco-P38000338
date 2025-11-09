@@ -48,14 +48,17 @@ def generate_launch_description():
 
     #### Launch ####
 
+    empty_pkg_path = get_package_share_directory('iiwa_description')
+    # Params: containing the robot description
+    empty_world_path = os.path.join(empty_pkg_path, 'gazebo', 'worlds', 'empty.world')
+
     empty_world_launch = IncludeLaunchDescription(
     PathJoinSubstitution([FindPackageShare('ros_gz_sim'), 'launch', 'gz_sim.launch.py']),
     launch_arguments={
         'pause': 'false',
-        'gz_args': ['-r ', 'empty.sdf'],
+        'gz_args': ['-r ', empty_world_path],
     }.items(),
     )
-
 
     iiwa_launch = IncludeLaunchDescription(
         PathJoinSubstitution(
@@ -63,7 +66,7 @@ def generate_launch_description():
          launch_arguments={
         #     'gui': LaunchConfiguration('gui'),
             'pause': 'false',
-            'gz_args': ['-r ', 'empty.sdf'],
+            'gz_args': ['-r ', empty_world_path],
         }.items(),
     )
 
