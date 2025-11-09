@@ -106,14 +106,26 @@ def generate_launch_description():
         condition=IfCondition(PythonExpression(["'", node, "' == 'client'"]))
     )
 
+    bridge_camera = Node(
+        package="ros_ign_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            "/camera@sensor_msgs/msg/Image@gz.msgs.Image",
+            "/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
+            "--ros-args",
+            "-r", "/camera:=/videocamera"], # Remapping
+        output="screen"
+    )
+
     # List of Arguments and Nodes
     return LaunchDescription([
         node_to_start,
         cmd_interface,
         ros2_kdl_node,
         ros2_kdl_client_node,
+        urdf_spawner_node,
         iiwa_launch,
         empty_world_launch,
-        urdf_spawner_node,
-        aruco_launch
+        aruco_launch,
+        bridge_camera
     ])
