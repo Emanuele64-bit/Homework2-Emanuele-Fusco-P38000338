@@ -4,7 +4,7 @@
   <name>ros2_kdl_package</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="mario.selvaggio@unina.it">user</maintainer>
+  <maintainer email="emanuele.fusco2@studenti.unina.it">user</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclcpp</depend>
@@ -17,12 +17,9 @@
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>xacro</exec_depend>
 
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
-
-  <depend>action_msgs</depend>
-  <depend>ros2_action_interface</depend>
-
-  <member_of_group>rosidl_interface_packages</member_of_group>
+  <!-- point 1c -->
+  <depend>ros2_kdl_action_interface</depend>
+  <depend>rclcpp_action</depend>
   
   <buildtool_depend>ament_cmake</buildtool_depend>
 

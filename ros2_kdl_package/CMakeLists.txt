@@ -14,6 +14,9 @@ find_package(kdl_parser REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+  # adding packages for point 1c
+find_package(ros2_kdl_action_interface REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -31,7 +34,10 @@ ament_target_dependencies(ros2_kdl_node
   rclcpp
   kdl_parser
   sensor_msgs
-  std_msgs)
+  std_msgs
+  ros2_kdl_action_interface # added in 1c
+  rclcpp_action # added in 1c
+  ) 
 
 install(TARGETS ros2_kdl_node
   DESTINATION lib/${PROJECT_NAME})
@@ -51,6 +57,21 @@ ament_target_dependencies(ros2_kdl_node_example
 install(TARGETS ros2_kdl_node_example
   DESTINATION lib/${PROJECT_NAME})
 
+# add the ros2_kdl_client_node executable
+add_executable(ros2_kdl_client_node src/ros2_kdl_client_node.cpp)
+target_include_directories(ros2_kdl_client_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(ros2_kdl_node_example PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+ament_target_dependencies(ros2_kdl_client_node
+  "ros2_kdl_action_interface"
+  "rclcpp"
+  "rclcpp_action"
+  )
+install(TARGETS ros2_kdl_client_node
+  DESTINATION lib/${PROJECT_NAME})
+
+
 install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
@@ -66,11 +87,5 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-find_package(rosidl_default_generators REQUIRED)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/Ros2kdl.action"
-)
 
 ament_package()
