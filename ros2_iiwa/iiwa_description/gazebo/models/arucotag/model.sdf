@@ -6,13 +6,13 @@
     <link name='base'>
       <visual name='base_visual'>
         <geometry>
-          <plane>
-            <normal>0 0 1</normal>
-            <size>0.1 0.1</size>
-          </plane>
+          <box>
+            <!-- <normal>1 0 0</normal> -->
+            <size>0.1 0.1 0.01</size>
+          </box>
         </geometry>
         <material>
-          <diffuse>1 1 1 1</diffuse>
+          <diffuse>0.1 1 1 1</diffuse>
           <specular>0.4 0.4 0.4 1</specular>
           <pbr>
             <metal>
