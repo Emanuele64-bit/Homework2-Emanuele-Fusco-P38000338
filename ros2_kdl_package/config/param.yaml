@@ -4,11 +4,11 @@ ros2_kdl_action_client:
     traj_type: "linear"
     s_type: "trapezoidal"
 
-    traj_duration: 5.0
-    acc_duration: 1.0
+    traj_duration: 10.0
+    acc_duration: 0.5
     total_time: 10.0
-    trajectory_len: 50.0
+    trajectory_len: 200.0
     Kp: 5.0
-    end_position: [0.45, 0.2, 0.55]
+    end_position: [-0.6, 0.3, 0.1]
 
     #ctrl: "velocity_ctrl"
