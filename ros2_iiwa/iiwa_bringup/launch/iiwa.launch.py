@@ -20,6 +20,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution, OrSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
@@ -293,16 +294,29 @@ def generate_launch_description():
         ],
         condition=UnlessCondition(OrSubstitution(use_planning, use_sim)),
     )
-    iiwa_simulation_world = PathJoinSubstitution(
+    """iiwa_simulation_world = PathJoinSubstitution(
         [FindPackageShare(description_package),
-            'gazebo/worlds', 'empty.world']
-    )
+            'gazebo/worlds', 'claudia.world']
+    )"""
 
-    """declared_arguments.append(DeclareLaunchArgument('gz_args', default_value='-r -v 1 empty.sdf',
+    """declared_arguments.append(DeclareLaunchArgument('gz_args', default_value='-r -v 1 empty.world',
                               description='Arguments for gz_sim'),)"""
+
+    iiwa_world_path = get_package_share_directory('iiwa_description') + '/gazebo/worlds/nuovo.world'
         
-    declared_arguments.append(DeclareLaunchArgument('gz_args', default_value=iiwa_simulation_world,
-                            description='Arguments for gz_sim'),)
+    declared_arguments.append(DeclareLaunchArgument(
+        'gz_args', 
+        default_value=f"-r {iiwa_world_path} -v 1",
+        description='Arguments for gz_sim'
+    ))
+
+    """declared_arguments.append(
+    DeclareLaunchArgument(
+        'gz_args',
+        default_value='-s -r -v 4 ',  # server-only, run, verbose
+        description='Arguments for gz_sim',
+    )
+    )"""
     
     """
     export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:world_simulation_models
@@ -384,6 +398,36 @@ def generate_launch_description():
         )
     )
 
+    bridge_camera = Node(
+        package="ros_ign_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            "/camera@sensor_msgs/msg/Image@gz.msgs.Image",
+            "/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
+            "--ros-args",
+            "-r", "/camera:=/videocamera"], # Remapping
+        output="screen"
+    )
+
+    aruco_node = Node(
+        package='aruco_ros',
+        executable='single',  # o 'multi' o il nome del nodo che vuoi lanciare
+        name='aruco_node',
+        output='screen',
+        parameters=[{
+            'marker_size': 0.1,  # 5 cm, ad esempio
+            'marker_id': 25,
+            'reference_frame': 'camera_link',
+            'marker_frame': 'aruco_marker',
+            'camera_frame': 'camera_link',
+        }],
+        remappings=[
+            ('/image','/videocamera'),
+            ('/camera_info', 'camera_info')
+        ]
+    )
+
+
     nodes = [
         gazebo,
         control_node,
@@ -396,6 +440,8 @@ def generate_launch_description():
         delay_rviz_after_joint_state_broadcaster_spawner,
         external_torque_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        aruco_node,
+        bridge_camera,
     ]
 
     return LaunchDescription(declared_arguments + nodes)

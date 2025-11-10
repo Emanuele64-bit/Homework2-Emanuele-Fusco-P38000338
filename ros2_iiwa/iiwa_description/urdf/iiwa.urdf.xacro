@@ -234,7 +234,7 @@
 
   <xacro:include filename="$(find iiwa_description)/urdf/iiwa_camera.xacro"/>
    
-  <xacro:iiwa_camera name="iiwa_camera" iiwa_camera_pos="0.0 0.0 -0.005" iiwa_camera_rpy="0.0 0.0 0.0" iiwa_camera_scale="0.05 0.05 0.05" prefix="${prefix}"/>
+  <xacro:iiwa_camera name="iiwa_camera" iiwa_camera_pos="0.0 0.0 0.17" iiwa_camera_rpy="3.14 -1.57 0" iiwa_camera_scale="0.05 0.05 0.05" prefix="${prefix}"/>
 
   </xacro:macro>
 

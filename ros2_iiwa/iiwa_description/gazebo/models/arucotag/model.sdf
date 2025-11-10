@@ -16,7 +16,7 @@
           <specular>0.4 0.4 0.4 1</specular>
           <pbr>
             <metal>
-              <albedo_map>model://arucotag/aruco-25.png</albedo_map>
+              <albedo_map>aruco-25.png</albedo_map>
             </metal>
           </pbr>
         </material>
