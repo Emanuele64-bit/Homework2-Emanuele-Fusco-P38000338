@@ -1,4 +1,5 @@
 #include "kdl_control.h"
+#include "utils.h"
 
 
 KDLController::KDLController(KDLRobot &_robot)
@@ -176,18 +177,15 @@ Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
         s = _P_c_o / p_norm;
     }
 
-
     // J_cam
     Eigen::MatrixXd J_cam = compute_J_cam(chain_);
 
     // S(s)
-    Eigen::Matrix3d S
-        {{0, -s(2), s(1)},
-         {s(2), 0, -s(0)},
-         {-s(1), s(0), 0}};
-
+    Eigen::Matrix3d S = skew(s);
+        // {{0, -s(2), s(1)},
+        //  {s(2), 0, -s(0)},
+        //  {-s(1), s(0), 0}};
     // std::cout << "S = " << S << std::endl;
-
 
     // R
     // Supponiamo R sia una Matrix3d
@@ -205,7 +203,6 @@ Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
 
     R.block<3, 3>(0, 0) = R_c_eigen.transpose();  // Blocco alto-sinistra
     R.block<3, 3>(3, 3) = R_c_eigen.transpose();  // Blocco basso-destra
-    // I blocchi (0,3) e (3,0) rimangono zero
 
     // std::cout << "R = " << R << std::endl;
 

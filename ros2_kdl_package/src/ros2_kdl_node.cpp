@@ -29,6 +29,10 @@
 #include "kdl_control.h"
 #include "kdl_planner.h"
 #include "kdl_parser/kdl_parser.hpp"
+
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
  
 using namespace KDL;
 using FloatArray = std_msgs::msg::Float64MultiArray;
@@ -38,6 +42,8 @@ using namespace std::placeholders;
 using ExecuteLinearTrajectory = ros2_kdl_action_interface::action::Ros2kdl;
 using GoalHandleTraj = rclcpp_action::ServerGoalHandle<ExecuteLinearTrajectory>;
 
+// tf2_ros::Buffer tf_buffer_{this->get_clock()};
+// tf2_ros::TransformListener tf_listener_{tf_buffer_};
 
 class Iiwa_pub_sub : public rclcpp::Node
 {
@@ -135,7 +141,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             aruco_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
                 "/aruco_node/pose", 
-                10, 
+                100, 
                 std::bind(&Iiwa_pub_sub::aruco_callback, this, std::placeholders::_1));
 
             // Wait for the aruco pose topic
@@ -518,6 +524,20 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // RCLCPP_INFO(this->get_logger(), "Executing %s", ctrl_.c_str());
 
+            // --- dopo aver ottenuto 'tag_pose' ---
+            // PRIMA di usare la posa del tag:
+            geometry_msgs::msg::PoseStamped tag_cam =
+            tf_buffer_.transform(tag_pose, "camera_optical_frame", tf2::durationFromSec(0.05));
+            
+            Eigen::Vector3d cPo(tag_cam.pose.position.x,
+                                tag_cam.pose.position.y,
+                                tag_cam.pose.position.z);
+            if (cPo.norm() < 1e-6) return;
+            
+            Eigen::Matrix3d Rc = Eigen::Matrix3d::Identity();
+            
+            // poi: calcolo J_ee, vision_ctrl(q, cPo, Rc, J_ee), publish qdot ...
+
             // Calcola matrice da aruco a image Plane
             KDL::Frame T_imgP_aruco = toKDL(aruco_msg->pose);
 
@@ -612,7 +632,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // error threshold
             double epsilon = 1e-3;
-            double e_max = 300;
+            double e_max = 10000;
 
             if(p_err_norm < epsilon || p_err_norm > e_max){
                 // Set joint velocity commands
@@ -726,6 +746,7 @@ class Iiwa_pub_sub : public rclcpp::Node
         // double qy;
         // double qz;
         // double qw;
+
 }; // end class Iiwa
 
 
