@@ -55,4 +55,7 @@ ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity_ctrl_nul
 > :mag:**Note:** by deafault the position controller and the server node are selected.
 
 ## :earth_africa: Gazebo world
-
+Insert this in the `.bashrc` file:
+```sh
+export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:~/ros2_ws/src/ros2_iiwa/iiwa_description/gazebo/models
+```
