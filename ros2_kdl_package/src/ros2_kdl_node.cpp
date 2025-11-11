@@ -20,6 +20,7 @@
 
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/wait_for_message.hpp"
@@ -47,7 +48,9 @@ class Iiwa_pub_sub : public rclcpp::Node
         node_handle_(std::shared_ptr<Iiwa_pub_sub>(this))
         {
             // declare cmd_interface parameter
-            declare_parameter("cmd_interface", "velocity_ctrl_null"); 
+            declare_parameter("cmd_interface", "velocity");
+            declare_parameter("ctrl", "velocity_ctrl"); 
+
 
             // declare_parameter("traj_duration", 5.0);
             // declare_parameter("acc_duration", 1.0);
@@ -57,9 +60,12 @@ class Iiwa_pub_sub : public rclcpp::Node
             // declare_parameter("end_position", std::vector<double>{0.25, 0.0, 0.35});
 
             get_parameter("cmd_interface", cmd_interface_);
-            RCLCPP_INFO(get_logger(),"Current cmd interface is: '%s'", cmd_interface_.c_str());
+            get_parameter("ctrl", ctrl_);
 
-            if (!(cmd_interface_ == "position" || cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "effort" || cmd_interface_ == "velocity_ctrl_null"))
+            RCLCPP_INFO(get_logger(),"Current cmd interface is: '%s'", cmd_interface_.c_str());
+            RCLCPP_INFO(get_logger(),"Current ctrl is: '%s'", ctrl_.c_str());
+
+            if (!(cmd_interface_ == "position" || cmd_interface_ == "velocity" || cmd_interface_ == "effort" || ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null"))
             {
                 RCLCPP_ERROR(get_logger(),"Selected cmd interface is not valid! Use 'position', 'velocity_ctrl', 'effort' or 'velocity_ctrl_null' instead..."); return;
             }
@@ -123,6 +129,11 @@ class Iiwa_pub_sub : public rclcpp::Node
                 10, 
                 std::bind(&Iiwa_pub_sub::joint_state_subscriber, this, std::placeholders::_1));
 
+            aruco_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+                "/aruco_node/pose", 
+                10, 
+                std::bind(&Iiwa_pub_sub::aruco_callback, this, std::placeholders::_1));
+
             // Wait for the joint_state topic
             while(!joint_state_available_){
                 RCLCPP_INFO(this->get_logger(), "No data received yet! ...");
@@ -167,7 +178,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     desired_commands_[i] = joint_positions_(i);
                 }
             }
-            else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+            else if((cmd_interface_ == "velocity")  && (ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null")){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
                 // timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
@@ -365,7 +376,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     joint_positions_cmd_ = joint_positions_;
                     robot_->getInverseKinematics(nextFrame, joint_positions_cmd_);
                 }
-                else if(cmd_interface_ == "velocity_ctrl"){
+                else if(cmd_interface_ == "velocity" && ctrl_ == "velocity_ctrl"){
                     // Compute differential IK
                     Vector6d cartvel; 
                     cartvel << p_.vel + Kp*error, o_error;
@@ -374,7 +385,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                 else if(cmd_interface_ == "effort"){
                     joint_efforts_cmd_.data[0] = 0.1*std::sin(2*M_PI*t_/total_time);
                 }
-                else if(cmd_interface_ == "velocity_ctrl_null"){ 
+                else if(cmd_interface_ == "velocity" && ctrl_ == "velocity_ctrl_null"){ 
                     std::cout << "Running velocity control null." << std::endl;
                     joint_velocities_cmd_.data = controller_.velocity_control_null(desFrame, Kp);
                 }
@@ -388,7 +399,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                         desired_commands_[i] = joint_positions_cmd_(i);
                     }
                 }
-                else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+                else if(ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null"){
                     // Set joint velocity commands
                     for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
                         desired_commands_[i] = joint_velocities_cmd_(i);
@@ -423,7 +434,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     desired_commands_[i] = joint_positions_cmd_(i);
                 }
             }
-            else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+            else if(ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null"){
                 // Set joint velocity commands
                 for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
                     desired_commands_[i] = 0.0;
@@ -472,7 +483,22 @@ class Iiwa_pub_sub : public rclcpp::Node
             }
         }
 
+
+        void aruco_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg){
+
+            aruco_state_avaliable_ = true;
+            //current_aruco_position_ = *msg; // salva la posizione attuale
+            RCLCPP_INFO(this->get_logger(),
+                "Aruco tag position: [%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f]",
+                msg->pose.position.x, msg->pose.position.y, msg->pose.position.z, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z, msg->pose.orientation.w);
+        }
+
+
+
+
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr jointSubscriber_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_sub_;
+
         rclcpp::Publisher<FloatArray>::SharedPtr cmdPublisher_;
         rclcpp::TimerBase::SharedPtr timer_; 
         rclcpp::TimerBase::SharedPtr subTimer_;
@@ -493,8 +519,10 @@ class Iiwa_pub_sub : public rclcpp::Node
 
         int iteration_;
         bool joint_state_available_;
+        bool aruco_state_avaliable_;
         double t_;
         std::string cmd_interface_;
+        std::string ctrl_;
         std::string traj_type_;
         std::string s_type_;
         

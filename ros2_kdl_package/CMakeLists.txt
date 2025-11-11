@@ -17,6 +17,7 @@ find_package(std_msgs REQUIRED)
   # adding packages for point 1c
 find_package(ros2_kdl_action_interface REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.

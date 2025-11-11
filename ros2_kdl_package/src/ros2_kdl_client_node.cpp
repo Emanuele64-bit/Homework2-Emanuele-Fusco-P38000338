@@ -18,7 +18,7 @@ class Iiwa_action_client : public rclcpp::Node
 {
     public:
         Iiwa_action_client()
-        : Node("ros2_kdl_action_client")
+        : Node("iiwa_action_client")
         {
             this->client_ptr_ = rclcpp_action::create_client<ExecuteLinearTrajectory>(this, "ros2kdl");
 
