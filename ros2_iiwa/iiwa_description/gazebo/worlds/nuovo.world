@@ -90,7 +90,7 @@
       <uri>
         model://arucotag
       </uri>
-      <pose>-0.88, -0.470, 0.43 -1.57 0 -1.20</pose>
+      <pose>-0.88, -0.450, 0.40 -1.57 0 -1.20</pose>
     </include>
   </world>
 </sdf>

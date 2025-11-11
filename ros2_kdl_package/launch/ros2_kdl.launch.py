@@ -46,7 +46,7 @@ def generate_launch_description():
         package='ros2_kdl_package',
         executable='ros2_kdl_node',
         output='screen',
-        parameters=[{'cmd_interface': cmd}, {"ctrl" : ctrl}],
+        parameters=[params, {'cmd_interface': cmd}, {"ctrl" : ctrl}],
         condition=IfCondition(
             PythonExpression([
                 "'", node, "' == 'server'",

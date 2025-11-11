@@ -24,10 +24,7 @@ Eigen::VectorXd KDLController::idCntr(KDL::JntArray &_qd,
             + robot_->getCoriolis() + robot_->getGravity() /*friction compensation?*/;
 }
 
-Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
-                                                    //  KDL::Twist &_desVel,
-                                                    //  KDL::Twist &_desAcc,
-                                                     double Kpp)
+Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos, double Kpp)
 {
     // Stato
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
@@ -77,10 +74,7 @@ Eigen::VectorXd KDLController::velocity_control_null(KDL::Frame &_desPos,
 }
 
 
-Eigen::VectorXd KDLController::compute_q0_dot(KDL::Frame &_desPos,
-                                                    //  KDL::Twist &_desVel,
-                                                    //  KDL::Twist &_desAcc,
-                                                     double Kpp)
+Eigen::VectorXd KDLController::compute_q0_dot(KDL::Frame &_desPos)
 {
     // Stato
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
@@ -123,13 +117,11 @@ Eigen::VectorXd KDLController::compute_q0_dot(KDL::Frame &_desPos,
     Eigen::VectorXd q0_dot; 
     q0_dot = gradient;
 
-
-
     return q0_dot;
-}
+} // end q0_dot function
 
 
-Eigen::VectorXd KDLController::compute_J_cam(KDL::Chain chain_)
+Eigen::MatrixXd KDLController::compute_J_cam(KDL::Chain chain_)
 {
     KDL::Jacobian J_ee = robot_->getEEJacobian();
 
@@ -141,8 +133,9 @@ Eigen::VectorXd KDLController::compute_J_cam(KDL::Chain chain_)
 
     KDL::Jacobian J_cam(chain_.getNrOfJoints());
     J_cam.data = J_ee.data;
+
     KDL::Frame T_cam_ee = T_ee_cam.Inverse();
-    //KDL::changeRefPoint(J_cam, T_ee_cam.p);
+
     J_cam.changeBase(T_cam_ee.M);
     //KDL::changeBase(J_cam, T_ee_cam.M);
 
@@ -152,18 +145,12 @@ Eigen::VectorXd KDLController::compute_J_cam(KDL::Chain chain_)
 }
 
 
-
-Eigen::VectorXd KDLController::vision_control (KDL::Frame &_desPos,
-                                                Eigen::Vector3d &_P_c_o,
-                                                double qx,
-                                                double qy,
-                                                double qz,
-                                                double qw,
-                                                double Kpp,
+Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
+                                                geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
                                                 KDL::Chain chain_,
                                                 Eigen::MatrixXd K)
 {
-    // Stato
+    // Numero di giunti
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
     const int n = q.size();
 
@@ -171,25 +158,35 @@ Eigen::VectorXd KDLController::vision_control (KDL::Frame &_desPos,
     Eigen::Vector3d s_d {0, 0, 1};
 
     // q0_dot
-    Eigen::VectorXd q0_dot = compute_q0_dot(_desPos, Kpp);
+    Eigen::VectorXd q0_dot = compute_q0_dot(_desPos);
+
+    // P_c_o
+    KDL::Frame aruco_frame = toKDL(aruco_msg->pose);
+    Eigen::Vector3d _P_c_o(aruco_frame.p[0], aruco_frame.p[1], aruco_frame.p[2]);
+    // R_c
+    KDL::Rotation R_c= aruco_frame.M;
+
+    // ||P||
+    double p_norm = (double)_P_c_o.norm();
+    // std::cout << "p_norm = " << p_norm << std::endl;
 
     // s
-    double p_norm = (double)_P_c_o.norm();
-    Eigen::Vector3d s = _P_c_o/p_norm;
+    Eigen::Vector3d s(0,0,1);
+    if (p_norm > 1e-6) {
+        s = _P_c_o / p_norm;
+    }
+
 
     // J_cam
     Eigen::MatrixXd J_cam = compute_J_cam(chain_);
-
-    // R_c
-    KDL::Rotation R_c = KDL::Rotation::Quaternion(qx, qy, qz, qw);
-    // Usa la rotazione
-    KDL::Frame T_ee_cam = KDL::Frame(R_c, KDL::Vector(0.0, 0.0, 0.17));
 
     // S(s)
     Eigen::Matrix3d S
         {{0, -s(2), s(1)},
          {s(2), 0, -s(0)},
          {-s(1), s(0), 0}};
+
+    // std::cout << "S = " << S << std::endl;
 
 
     // R
@@ -210,7 +207,7 @@ Eigen::VectorXd KDLController::vision_control (KDL::Frame &_desPos,
     R.block<3, 3>(3, 3) = R_c_eigen.transpose();  // Blocco basso-destra
     // I blocchi (0,3) e (3,0) rimangono zero
 
-
+    // std::cout << "R = " << R << std::endl;
 
     // L
     Eigen::Matrix<double, 3, 6> L;
@@ -219,18 +216,18 @@ Eigen::VectorXd KDLController::vision_control (KDL::Frame &_desPos,
     L.block<3, 3>(0, 0) = -(1/p_norm)*(Eigen::Matrix3d::Identity() - s*s.transpose());
     L.block<3, 3>(0, 3) = S;
     L = L*R;
+    // std::cout << "L = " << L << std::endl;
+
+    double lambda = 0.01;
+    Eigen::MatrixXd pseudoinverse = (L*J_cam).transpose()*((L*J_cam)*(L*J_cam).transpose() + lambda*Eigen::MatrixXd::Identity(3,3)).inverse();
 
     // N
-    Eigen::Matrix<double, 7, 7> N;
-    N.setZero();
+    Eigen::MatrixXd N = Eigen::MatrixXd::Identity(n, n) -  pseudoinverse*L*J_cam;
+    // std::cout << "N = " << N << std::endl;
 
-    Eigen::MatrixXd pseudoinverse = (L*J_cam).transpose()*((L*J_cam)*(L*J_cam).transpose()).inverse();
-
-    N = Eigen::MatrixXd::Identity(n, n) -  pseudoinverse*L*J_cam;
 
     Eigen::VectorXd q_dot;
     q_dot = K*pseudoinverse*s_d + N*q0_dot;
-
+    // std::cout << "q_dot = " << q_dot << std::endl;
     return q_dot;
 }
-

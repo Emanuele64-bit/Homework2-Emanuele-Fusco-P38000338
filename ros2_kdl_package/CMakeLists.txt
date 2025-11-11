@@ -38,6 +38,7 @@ ament_target_dependencies(ros2_kdl_node
   std_msgs
   ros2_kdl_action_interface # added in 1c
   rclcpp_action # added in 1c
+  geometry_msgs # added in 2b
   ) 
 
 install(TARGETS ros2_kdl_node
@@ -68,7 +69,7 @@ ament_target_dependencies(ros2_kdl_client_node
   "ros2_kdl_action_interface"
   "rclcpp"
   "rclcpp_action"
-  )
+)
 install(TARGETS ros2_kdl_client_node
   DESTINATION lib/${PROJECT_NAME})
 
