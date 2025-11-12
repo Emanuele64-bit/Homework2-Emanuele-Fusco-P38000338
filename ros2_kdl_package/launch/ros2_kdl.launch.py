@@ -54,7 +54,15 @@ def generate_launch_description():
         )
     )
 
-    # Bridge per set_pose with delay
+    ros2_kdl_client_node = Node(
+        package='ros2_kdl_package',
+        executable='ros2_kdl_client_node',
+        output='screen',
+        parameters=[params],
+        condition=IfCondition(PythonExpression(["'", node, "' == 'client'"]))
+    )
+
+    # Bridge per set_pose dell'aruco tag
     bridge_srv =  Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
@@ -63,14 +71,6 @@ def generate_launch_description():
                 '/world/nuovo/set_pose@ros_gz_interfaces/srv/SetEntityPose'
             ],
             output='screen',
-    )
-
-    ros2_kdl_client_node = Node(
-        package='ros2_kdl_package',
-        executable='ros2_kdl_client_node',
-        output='screen',
-        parameters=[params],
-        condition=IfCondition(PythonExpression(["'", node, "' == 'client'"]))
     )
 
     # List of Arguments and Nodes

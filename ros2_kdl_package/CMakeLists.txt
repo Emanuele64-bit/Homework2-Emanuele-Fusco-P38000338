@@ -78,30 +78,6 @@ install(TARGETS ros2_kdl_client_node
   DESTINATION lib/${PROJECT_NAME})
 
 
-# add_executable(ros2_kdl_service src/ros2_kdl_node.cpp src/kdl_robot.cpp src/kdl_planner.cpp src/kdl_control.cpp)
-# target_include_directories(ros2_kdl_node PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>
-#   ${EIGEN3_INCLUDE_DIRS})
-# target_compile_features(ros2_kdl_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
-# ament_target_dependencies(ros2_kdl_node 
-#   orocos_kdl
-#   rclcpp
-#   kdl_parser
-#   sensor_msgs
-#   std_msgs
-#   ros2_kdl_action_interface # added in 1c
-#   rclcpp_action # added in 1c
-#   geometry_msgs # added in 2b
-#   tf2_ros
-#   tf2_geometry_msgs
-#   ) 
-
-# install(TARGETS ros2_kdl_node
-#   DESTINATION lib/${PROJECT_NAME})
-
-
 # Install Directory
 install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}

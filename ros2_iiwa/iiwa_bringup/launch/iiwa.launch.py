@@ -449,7 +449,6 @@ def generate_launch_description():
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
         aruco_node,
         bridge_camera,
-        # bridge_srv,
     ]
 
     return LaunchDescription(declared_arguments + nodes)
