@@ -44,6 +44,8 @@ ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=ve
 Open a ROS 2 workspace in a terminal and build the needed packages:
 ```sh
 colcon build --packages-select iiwa_description iiwa_bringup ros2_kdl_package ros2_kdl_action_interface
+```
+```
 source install/setup.bash
 ```
 Then, launch the iiwa robot in Rviz:
