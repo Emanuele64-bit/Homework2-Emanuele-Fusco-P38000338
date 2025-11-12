@@ -95,7 +95,7 @@ ros2 run rqt_image_view rqt_image_view
 ```
 and by selecting the topic `/aruco_node/result`.
 
-### :camera: Vision control (not working properly)
+### :camera: Vision control
 Launch the iiwa robot in gazebo by setting `use_sim:="true"` as before:
 ```sh
 ros2 launch iiwa_bringup iiwa.launch.py command_interface:="velocity" robot_controller:="velocity_controller" use_sim:="true"
