@@ -1,11 +1,11 @@
 # Homework 2: Control your Robot
-:construction_worker: **Claudia Adamo**, *P38000---*
+:construction_worker: **Claudia Adamo**, *P38000357*
 
 :construction_worker: **Emanuele Fusco**, *P380000338*
 
 :construction_worker: **Giacomo Ricco**, *P380000354*
 
-:construction_worker: **Francesco Romano**, *P38000---*
+:construction_worker: **Francesco Romano**, *P38000363*
 
 ## :video_game: Kinematic Control
 Open a ROS 2 workspace in a terminal and build the needed packages:
@@ -62,7 +62,7 @@ ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=ve
 
 Finally, in another terminal launch the client node:
 ```sh
-ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=velocity_ctrl|velocity_ctrl_null node:=client
+ros2 launch ros2_kdl_package ros2_kdl.launch.py node:=client
 ```
 > :mag:**Note:** by deafault the position controller and the server node are selected.
 
@@ -94,3 +94,22 @@ In another terminal, the Aruco tag can be detected by the camera by running the 
 ros2 run rqt_image_view rqt_image_view
 ```
 and by selecting the topic `/aruco_node/result`.
+
+### :camera: Vision control (not working properly)
+Launch the iiwa robot in gazebo by setting `use_sim:="true"` as before:
+```sh
+ros2 launch iiwa_bringup iiwa.launch.py command_interface:="velocity" robot_controller:="velocity_controller" use_sim:="true"
+```
+In another terminal, launch the `ros2_kdl_node` with `ctrl:=vision_ctrl`:
+```sh
+ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=vision_ctrl
+```
+
+### Moving the aruco tag
+In another terminal, move the aruco tag:
+```sh
+ros2 service call /world/nuovo/set_pose ros_gz_interfaces/srv/SetEntityPose "{
+  entity: {name: 'arucotag', id: 0, type: 2}, 
+  pose: {position: {x: -0.88, y: -0.40, z: 0.43}, orientation: {x: -0.59, y: 0.4, z: -.4, w: 0.58}}
+}"
+```
