@@ -216,9 +216,9 @@ Eigen::VectorXd KDLController::vision_control(geometry_msgs::msg::PoseStamped::C
     Eigen::VectorXd q0_dot = compute_q0_dot(aruco_frame);
 
     Eigen::VectorXd q_dot;
-    q_dot = K*pseudoinverse*s_d + N*q0_dot;
+    q_dot = -K*pseudoinverse*s_d + N*q0_dot;
     // std::cout << "q_dot = " << q_dot << std::endl;
 
     std::cout << "direction error = " << s-s_d << std::endl;
-    return -q_dot;
+    return q_dot;
 }
