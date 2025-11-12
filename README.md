@@ -12,7 +12,7 @@ Open a ROS 2 workspace in a terminal and build the needed packages:
 ```sh
 colcon build --packages-select iiwa_description iiwa_bringup ros2_kdl_package
 ```
-```
+```sh
 source install/setup.bash
 ```
 > 💡**Tip:** to improve the build, first run this line:
@@ -47,7 +47,7 @@ Open a ROS 2 workspace in a terminal and build the needed packages:
 ```sh
 colcon build --packages-select iiwa_description iiwa_bringup ros2_kdl_package ros2_kdl_action_interface
 ```
-```
+```sh
 source install/setup.bash
 ```
 Then, launch the iiwa robot in Rviz:
@@ -70,12 +70,16 @@ ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=ve
 Open a ROS 2 workspace in a terminal and build the needed packages:
 ```sh
 colcon build --packages-select iiwa_description iiwa_bringup ros2_kdl_package ros2_kdl_action_interface aruco aruco_ros aruco_msgs
+```
+```sh
 source install/setup.bash
 ```
 
 Add the world path to `GZ_SIM_RESOURCE_PATH` by modifying the `.bashrc` file as follows:
 ```sh
 echo 'export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:~/ros2_ws/src/ros2_iiwa/iiwa_description/gazebo/models' >> ~/.bashrc
+```
+```
 source ~/.bashrc
 ```
 >:white_check_mark:**Test:** to check if all is done properly you can run `echo $GZ_SIM_RESOURCE_PATH` and it should show the path `/home/user/ros2_ws/src/ros2_iiwa/iiwa_description/gazebo/models`.
