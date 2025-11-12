@@ -54,6 +54,17 @@ def generate_launch_description():
         )
     )
 
+    # Bridge per set_pose with delay
+    bridge_srv =  Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='pose_bridge',
+            arguments=[
+                '/world/nuovo/set_pose@ros_gz_interfaces/srv/SetEntityPose'
+            ],
+            output='screen',
+    )
+
     ros2_kdl_client_node = Node(
         package='ros2_kdl_package',
         executable='ros2_kdl_client_node',
@@ -69,4 +80,5 @@ def generate_launch_description():
         controller_arg,
         ros2_kdl_node,
         ros2_kdl_client_node,
+        bridge_srv
     ])
