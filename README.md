@@ -11,12 +11,14 @@
 Open a ROS 2 workspace in a terminal and build the needed packages:
 ```sh
 colcon build --packages-select iiwa_description iiwa_bringup ros2_kdl_package
+```
+```
 source install/setup.bash
 ```
 > 💡**Tip:** to improve the build, first run this line:
-> ```sh
-> rm -r build/ log/ install/
-> ```
+>> ```sh
+>> rm -r build/ log/ install/
+>> ```
 > and then the `colcon build` and `source` command.
 
 Then, launch the iiwa robot in Rviz:
