@@ -17,6 +17,9 @@ find_package(std_msgs REQUIRED)
   # adding packages for point 1c
 find_package(ros2_kdl_action_interface REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -37,6 +40,9 @@ ament_target_dependencies(ros2_kdl_node
   std_msgs
   ros2_kdl_action_interface # added in 1c
   rclcpp_action # added in 1c
+  geometry_msgs # added in 2b
+  tf2_ros
+  tf2_geometry_msgs
   ) 
 
 install(TARGETS ros2_kdl_node
@@ -67,7 +73,7 @@ ament_target_dependencies(ros2_kdl_client_node
   "ros2_kdl_action_interface"
   "rclcpp"
   "rclcpp_action"
-  )
+)
 install(TARGETS ros2_kdl_client_node
   DESTINATION lib/${PROJECT_NAME})
 

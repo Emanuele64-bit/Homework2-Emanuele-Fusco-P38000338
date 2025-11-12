@@ -94,3 +94,13 @@ In another terminal, the Aruco tag can be detected by the camera by running the 
 ros2 run rqt_image_view rqt_image_view
 ```
 and by selecting the topic `/aruco_node/result`.
+
+### :camera: Vision control (not working properly)
+Launch the iiwa robot in gazebo by setting `use_sim:="true"` as before:
+```sh
+ros2 launch iiwa_bringup iiwa.launch.py command_interface:="velocity" robot_controller:="velocity_controller" use_sim:="true"
+```
+In another terminal, launch the `ros2_kdl_node` with `ctrl:=vision_ctrl`:
+```sh
+ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=vision_ctrl
+```

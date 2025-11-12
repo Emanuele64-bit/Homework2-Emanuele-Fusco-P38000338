@@ -20,6 +20,7 @@
 
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/wait_for_message.hpp"
@@ -28,6 +29,10 @@
 #include "kdl_control.h"
 #include "kdl_planner.h"
 #include "kdl_parser/kdl_parser.hpp"
+
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
  
 using namespace KDL;
 using FloatArray = std_msgs::msg::Float64MultiArray;
@@ -37,6 +42,8 @@ using namespace std::placeholders;
 using ExecuteLinearTrajectory = ros2_kdl_action_interface::action::Ros2kdl;
 using GoalHandleTraj = rclcpp_action::ServerGoalHandle<ExecuteLinearTrajectory>;
 
+// tf2_ros::Buffer tf_buffer_{this->get_clock()};
+// tf2_ros::TransformListener tf_listener_{tf_buffer_};
 
 class Iiwa_pub_sub : public rclcpp::Node
 {
@@ -47,7 +54,8 @@ class Iiwa_pub_sub : public rclcpp::Node
         node_handle_(std::shared_ptr<Iiwa_pub_sub>(this))
         {
             // declare cmd_interface parameter
-            declare_parameter("cmd_interface", "velocity_ctrl_null"); 
+            declare_parameter("cmd_interface", "velocity");
+            declare_parameter("ctrl", "velocity_ctrl"); 
 
             // declare_parameter("traj_duration", 5.0);
             // declare_parameter("acc_duration", 1.0);
@@ -57,9 +65,12 @@ class Iiwa_pub_sub : public rclcpp::Node
             // declare_parameter("end_position", std::vector<double>{0.25, 0.0, 0.35});
 
             get_parameter("cmd_interface", cmd_interface_);
-            RCLCPP_INFO(get_logger(),"Current cmd interface is: '%s'", cmd_interface_.c_str());
+            get_parameter("ctrl", ctrl_);
 
-            if (!(cmd_interface_ == "position" || cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "effort" || cmd_interface_ == "velocity_ctrl_null"))
+            RCLCPP_INFO(get_logger(),"Current cmd interface is: '%s'", cmd_interface_.c_str());
+            RCLCPP_INFO(get_logger(),"Current ctrl is: '%s'", ctrl_.c_str());
+
+            if (!(cmd_interface_ == "position" || cmd_interface_ == "velocity" || cmd_interface_ == "effort" || ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null" || ctrl_=="vision_ctrl"))
             {
                 RCLCPP_ERROR(get_logger(),"Selected cmd interface is not valid! Use 'position', 'velocity_ctrl', 'effort' or 'velocity_ctrl_null' instead..."); return;
             }
@@ -98,7 +109,6 @@ class Iiwa_pub_sub : public rclcpp::Node
             auto parameter = parameters_client->get_parameters({"robot_description"});
 
             // create KDLrobot structure
-            KDL::Tree robot_tree;
             if (!kdl_parser::treeFromString(parameter[0].value_to_string(), robot_tree)){
                 std::cout << "Failed to retrieve robot_description param!";
             }
@@ -125,9 +135,28 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // Wait for the joint_state topic
             while(!joint_state_available_){
-                RCLCPP_INFO(this->get_logger(), "No data received yet! ...");
+                RCLCPP_INFO(this->get_logger(), "No joint data received yet! ...");
                 rclcpp::spin_some(node_handle_);
             }
+
+            aruco_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+                "/aruco_node/pose", 
+                300, 
+                std::bind(&Iiwa_pub_sub::aruco_callback, this, std::placeholders::_1));
+
+            // Wait for the aruco pose topic
+            while(!aruco_state_avaliable_){
+                RCLCPP_INFO(this->get_logger(), "No aruco tag detected yet! ...");
+                rclcpp::spin_some(node_handle_);
+            }
+
+            // Create an action server
+            this->action_server_ = rclcpp_action::create_server<ExecuteLinearTrajectory>(
+                this,
+                "ros2kdl",
+                std::bind(&Iiwa_pub_sub::handle_goal, this, _1, _2),
+                std::bind(&Iiwa_pub_sub::handle_cancel, this, _1),
+                std::bind(&Iiwa_pub_sub::handle_accepted, this, _1)); 
 
             // Update KDLrobot object
             robot_->update(toStdVector(joint_positions_.data),toStdVector(joint_velocities_.data));
@@ -144,16 +173,7 @@ class Iiwa_pub_sub : public rclcpp::Node
             KDL::JntArray q(nj);
             robot_->getInverseKinematics(init_cart_pose_, q);
             // std::cout << "The inverse kinematics returned: " <<std::endl; 
-            // std::cout << q.data <<std::endl;
-
-
-            // Create an action server
-            this->action_server_ = rclcpp_action::create_server<ExecuteLinearTrajectory>(
-                this,
-                "ros2kdl",
-                std::bind(&Iiwa_pub_sub::handle_goal, this, _1, _2),
-                std::bind(&Iiwa_pub_sub::handle_cancel, this, _1),
-                std::bind(&Iiwa_pub_sub::handle_accepted, this, _1));            
+            // std::cout << q.data <<std::endl;        
 
             // Creating the publisher
             if(cmd_interface_ == "position"){
@@ -167,11 +187,20 @@ class Iiwa_pub_sub : public rclcpp::Node
                     desired_commands_[i] = joint_positions_(i);
                 }
             }
-            else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+            else if((cmd_interface_ == "velocity")  && (ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null")){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
-                // timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
-                //                             std::bind(&Iiwa_pub_sub::cmd_publisher, this));
+            
+                // Set joint velocity commands
+                for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
+                    desired_commands_[i] = joint_velocities_(i);
+                }
+            }
+            else if((cmd_interface_ == "velocity")  && (ctrl_ == "vision_ctrl")){
+                // Create cmd publisher
+                cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
+                timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
+                                            std::bind(&Iiwa_pub_sub::cmd_publisher_vision, this));
             
                 // Set joint velocity commands
                 for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
@@ -181,8 +210,6 @@ class Iiwa_pub_sub : public rclcpp::Node
             else if(cmd_interface_ == "effort"){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/effort_controller/commands", 10);
-                // timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
-                //                             std::bind(&Iiwa_pub_sub::cmd_publisher, this));
             
                 // Set joint effort commands
                 for (long int i = 0; i < joint_efforts_cmd_.data.size(); ++i) {
@@ -200,6 +227,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
     private:
         rclcpp_action::Server<ExecuteLinearTrajectory>::SharedPtr action_server_;
+
 
         rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid,
                                                 std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
@@ -228,11 +256,10 @@ class Iiwa_pub_sub : public rclcpp::Node
                                             goal->end_position[0],
                                             goal->end_position[1],
                                             goal->end_position[2]);
-
-
             (void)uuid; 
             return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
         }
+
 
         rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleTraj> goal_handle)
         {
@@ -241,6 +268,7 @@ class Iiwa_pub_sub : public rclcpp::Node
             return rclcpp_action::CancelResponse::ACCEPT;
         }
 
+
         void handle_accepted(const std::shared_ptr<GoalHandleTraj> goal_handle)
         {
             using namespace std::placeholders;
@@ -248,12 +276,13 @@ class Iiwa_pub_sub : public rclcpp::Node
             std::thread{std::bind(&Iiwa_pub_sub::cmd_publisher, this, _1), goal_handle}.detach();
         }
 
+
         void cmd_publisher(const std::shared_ptr<GoalHandleTraj> goal_handle){
             iteration_ = iteration_ + 1;
 
             KDLController controller_(*robot_);
 
-            RCLCPP_INFO(this->get_logger(), "Executing goal");
+            RCLCPP_INFO(this->get_logger(), "[%s] Executing goal", ctrl_.c_str());
 
             const auto goal = goal_handle->get_goal();
             auto feedback = std::make_shared<ExecuteLinearTrajectory::Feedback>();
@@ -365,7 +394,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     joint_positions_cmd_ = joint_positions_;
                     robot_->getInverseKinematics(nextFrame, joint_positions_cmd_);
                 }
-                else if(cmd_interface_ == "velocity_ctrl"){
+                else if(cmd_interface_ == "velocity" && ctrl_ == "velocity_ctrl"){
                     // Compute differential IK
                     Vector6d cartvel; 
                     cartvel << p_.vel + Kp*error, o_error;
@@ -374,7 +403,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                 else if(cmd_interface_ == "effort"){
                     joint_efforts_cmd_.data[0] = 0.1*std::sin(2*M_PI*t_/total_time);
                 }
-                else if(cmd_interface_ == "velocity_ctrl_null"){ 
+                else if(cmd_interface_ == "velocity" && ctrl_ == "velocity_ctrl_null"){ 
                     std::cout << "Running velocity control null." << std::endl;
                     joint_velocities_cmd_.data = controller_.velocity_control_null(desFrame, Kp);
                 }
@@ -388,7 +417,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                         desired_commands_[i] = joint_positions_cmd_(i);
                     }
                 }
-                else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+                else if(ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null"){
                     // Set joint velocity commands
                     for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
                         desired_commands_[i] = joint_velocities_cmd_(i);
@@ -411,7 +440,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                 RCLCPP_INFO(this->get_logger(), "Publish feedback: error_norm = %f", p_err_norm);
 
                 loop_rate.sleep();
-            }
+            } // end while
 
             RCLCPP_INFO_ONCE(this->get_logger(), "Trajectory executed successfully ...");
                     
@@ -423,7 +452,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                     desired_commands_[i] = joint_positions_cmd_(i);
                 }
             }
-            else if(cmd_interface_ == "velocity_ctrl" || cmd_interface_ == "velocity_ctrl_null"){
+            else if(ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null"){
                 // Set joint velocity commands
                 for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
                     desired_commands_[i] = 0.0;
@@ -449,22 +478,159 @@ class Iiwa_pub_sub : public rclcpp::Node
             }
 
 
-        }
+        } // end cmd_publisher
+
+
+
+
+
+        void cmd_publisher_vision(){
+            iteration_ = iteration_ + 1;
+
+            KDLController controller_(*robot_);
+
+            // RCLCPP_INFO(this->get_logger(), "Executing %s", ctrl_.c_str());
+
+            // Calcola matrice di trasformazione da aruco a image Plane
+            KDL::Frame T_imgP_aruco = toKDL(aruco_msg->pose);
+            std::cout << "Frame id = " << aruco_msg->header.frame_id << std::endl;
+
+            // matrice di trasformazione da image Plane a camera di tipo Eigen
+            double focal_length = 1.047;
+            double width = 320;
+            double height = 240;
+            Eigen::Matrix4d T_cam_imgP_eigen = T_camera_image_from_fov(focal_length, width, height);
+
+            // Conversione esplicita a KDL
+            Eigen::Matrix3d R_eigen = T_cam_imgP_eigen.block<3,3>(0,0);
+            KDL::Rotation R_c_i(
+                R_eigen(0,0), R_eigen(0,1), R_eigen(0,2),
+                R_eigen(1,0), R_eigen(1,1), R_eigen(1,2),
+                R_eigen(2,0), R_eigen(2,1), R_eigen(2,2)
+            );
+            // Vector position
+            Eigen::Vector3d p_eigen = T_cam_imgP_eigen.block<3,1>(0,3);
+            KDL::Vector p_c_i(p_eigen(0), p_eigen(1), p_eigen(2));
+            // Matrice KDL
+            KDL::Frame T_cam_imgP = KDL::Frame(
+                R_c_i,
+                p_c_i
+            );
+
+            // Matrix of the camera wrt ee
+            KDL::Frame T_ee_cam = KDL::Frame(
+                KDL::Rotation::RPY(3.14, -1.57, 0.0),
+                KDL::Vector(0.0, 0.0, 0.17)
+            );
+            // pose and orientation of the aruco wrt ee
+            current_aruco_frame_ee = T_ee_cam*T_imgP_aruco; // <-- Transformation in ee base
+
+            // Compute EE frame
+            KDL::Frame cartpos = robot_->getEEFrame(); 
+
+            // Compute desired Frame (aruco wrt base)
+            KDL::Frame desFrame = cartpos*current_aruco_frame_ee; 
+            // desFrame.M = cartpos.M; 
+            // desFrame.p = toKDL(p_.pos); 
+
+            // EE's trajectory initial position
+            // Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data));
+
+            // EE's trajectory end position: arucotag
+            Eigen::Vector3d end_position_(desFrame.p.data); // -0.88, -0.450, 0.40
+            // end_position_ << desFrame.p.data[0], desFrame.p.data[1], desFrame.p.data[2];
+            
+            std::cout << "end_position = " << end_position_ << std::endl;
+
+            // // Plan trajectory
+            // double traj_radius = 0.15;
+            // // Retrieve the first trajectory point
+            // if(traj_type_ == "linear"){
+            //     planner_ = KDLPlanner(traj_duration, acc_duration, init_position, end_position_); // currently using trapezoidal velocity profile
+            //     if(s_type_ == "trapezoidal")
+            //     {
+            //         p_ = planner_.linear_traj_trapezoidal(t_);
+            //     }else if(s_type_ == "cubic")
+            //     {
+            //         p_ = planner_.linear_traj_cubic(t_);
+            //     }
+            // } 
+            // else if(traj_type_ == "circular")
+            // {
+            //     planner_ = KDLPlanner(traj_duration, init_position, traj_radius, acc_duration);
+            //     if(s_type_ == "trapezoidal")
+            //     {
+            //         p_ = planner_.circular_traj_trapezoidal(t_);
+            //     }else if(s_type_ == "cubic")
+            //     {
+            //         p_ = planner_.circular_traj_cubic(t_);
+            //     }
+            // }
+
+            // compute errors
+            // Eigen::Vector3d error = computeLinearError(p_.pos, Eigen::Vector3d(cartpos.p.data));
+            Eigen::Vector3d error = computeLinearError(
+                Eigen::Vector3d(desFrame.p.data), 
+                Eigen::Vector3d(cartpos.p.data));
+            // Eigen::Vector3d o_error = computeOrientationError(toEigen(init_cart_pose_.M), toEigen(cartpos.M));
+            double p_err_norm = (double)error.norm();
+            std::cout << "||e_p("<< t_ <<")|| = " << p_err_norm << std::endl;
+            t_ ++;
+
+            // error threshold
+            double epsilon = 1e-3;
+            double e_max = 10000;
+
+            if(p_err_norm < epsilon || p_err_norm > e_max){
+                // Set joint velocity commands
+                for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
+                    desired_commands_[i] = 0.0; // Stop it
+                }
+                RCLCPP_INFO_ONCE(this->get_logger(), "Aruco tag followed successfully!");
+            }
+            else{
+                // std::cout << "Running vision control." << std::endl;
+                KDL::Chain chain_;
+                robot_tree.getChain(
+                                    robot_tree.getRootSegment()->first,
+                                    std::prev(
+                                                std::prev(
+                                                    robot_tree.getSegments().end())
+                                                )->first,
+                                    chain_);
+
+                unsigned int n = robot_->getNrJnts();
+
+                double K_gain = 1;
+                Eigen::MatrixXd K = Eigen::MatrixXd::Identity(n,n)*K_gain;
+
+                joint_velocities_cmd_.data = controller_.vision_control(this->aruco_msg, 
+                                                                        chain_,
+                                                                        K);
+                double dt = 0.1; // dipende dal timer
+                for (int i = 0; i < joint_positions_.data.size(); ++i) {
+                    joint_positions_.data[i] += joint_velocities_cmd_.data[i] * dt;
+                    joint_velocities_.data[i] = joint_velocities_cmd_.data[i];
+                }
+                // Update KDLrobot structure
+                robot_->update(toStdVector(joint_positions_.data),toStdVector(joint_velocities_.data));
+
+                // Set joint velocity commands
+                for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
+                    desired_commands_[i] = joint_velocities_cmd_(i);
+                }
+
+            }// end else
+            
+            // Create msg and publish
+            std_msgs::msg::Float64MultiArray cmd_msg;
+            cmd_msg.data = desired_commands_;
+            cmdPublisher_->publish(cmd_msg);
+
+        } // end function
+
 
         void joint_state_subscriber(const sensor_msgs::msg::JointState& sensor_msg){
-
-            // for (size_t i = 0; i < sensor_msg.effort.size(); ++i) {
-            //     RCLCPP_INFO(this->get_logger(), "Positions %zu: %f", i, sensor_msg.position[i]);                
-            // }
-            // std::cout<<"\n";
-            // for (size_t i = 0; i < sensor_msg.effort.size(); ++i) {
-            //     RCLCPP_INFO(this->get_logger(), "Velocities %zu: %f", i, sensor_msg.velocity[i]);
-            // }
-            // std::cout<<"\n";
-            // for (size_t i = 0; i < sensor_msg.effort.size(); ++i) {
-            //     RCLCPP_INFO(this->get_logger(), "Efforts %zu: %f", i, sensor_msg.effort[i]);
-            // }
-
             joint_state_available_ = true;
             for (unsigned int i  = 0; i < sensor_msg.position.size(); i++){
                 joint_positions_.data[i] = sensor_msg.position[i];
@@ -472,10 +638,45 @@ class Iiwa_pub_sub : public rclcpp::Node
             }
         }
 
+
+        void aruco_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg){
+            aruco_state_avaliable_ = true;
+            RCLCPP_INFO(this->get_logger(),
+                "ArucoTag pose: [%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f]",
+                msg->pose.position.x, msg->pose.position.y, msg->pose.position.z, 
+                msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z, msg->pose.orientation.w);
+            
+                aruco_msg = msg;
+        }
+
+
+
+
+        Eigen::Matrix4d T_camera_image_from_fov(double hfov, int width, int height)
+        {
+            const double fx = static_cast<double>(width) / (2.0 * std::tan(hfov / 2.0));
+            const double vfov = 2.0 * std::atan((double)height / (double)width * std::tan(hfov / 2.0));
+            const double fy = static_cast<double>(height) / (2.0 * std::tan(vfov / 2.0));
+            const double cx = width  / 2.0;
+            const double cy = height / 2.0;
+
+            Eigen::Matrix4d Tci = Eigen::Matrix4d::Identity();
+            Tci(0,0) = 1.0/fx;   Tci(0,2) = -cx/fx;
+            Tci(1,1) = 1.0/fy;   Tci(1,2) = -cy/fy;
+
+            return Tci; // camera <- image
+        }
+
+
+        // Attributes
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr jointSubscriber_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_sub_;
+
         rclcpp::Publisher<FloatArray>::SharedPtr cmdPublisher_;
+
         rclcpp::TimerBase::SharedPtr timer_; 
         rclcpp::TimerBase::SharedPtr subTimer_;
+
         rclcpp::Node::SharedPtr node_handle_;
 
         std::vector<double> desired_commands_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -487,14 +688,17 @@ class Iiwa_pub_sub : public rclcpp::Node
         KDL::JntArray joint_efforts_cmd_;
 
         std::shared_ptr<KDLRobot> robot_;
+        KDL::Tree robot_tree;
         KDLPlanner planner_;
 
         trajectory_point p_;
 
         int iteration_;
         bool joint_state_available_;
+        bool aruco_state_avaliable_;
         double t_;
         std::string cmd_interface_;
+        std::string ctrl_;
         std::string traj_type_;
         std::string s_type_;
         
@@ -507,6 +711,15 @@ class Iiwa_pub_sub : public rclcpp::Node
         std::vector<double> end_position;
 
         KDL::Frame init_cart_pose_;
+
+        // Eigen::Vector3d current_aruco_position_;
+        geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg;
+        KDL::Frame current_aruco_frame_ee;
+        // double qx;
+        // double qy;
+        // double qz;
+        // double qw;
+
 }; // end class Iiwa
 
 

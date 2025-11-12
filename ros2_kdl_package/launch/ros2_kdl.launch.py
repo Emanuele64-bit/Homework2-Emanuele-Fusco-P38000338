@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, IncludeLaunchDescription, TimerAction
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -19,12 +19,19 @@ def generate_launch_description():
 
     #### Arguments ####
 
+    controller_arg = DeclareLaunchArgument(
+        name='ctrl',
+        description = 'Select: "velocity_ctrl" for velocity controller; "velocity_ctrl_null" for velocity controller in the null space',
+        default_value='velocity_ctrl',
+    )
+    ctrl = LaunchConfiguration("ctrl")
+
     cmd_interface = DeclareLaunchArgument(
         name='cmd_interface',
         description = 'Select type of controller',
-        default_value='velocity_ctrl',
+        default_value='velocity',
     )
-    ctrl = LaunchConfiguration("cmd_interface")
+    cmd = LaunchConfiguration("cmd_interface")
 
     node_to_start = DeclareLaunchArgument(
         name='node',
@@ -33,44 +40,18 @@ def generate_launch_description():
     )
     node = LaunchConfiguration("node")
 
-    #### Launch ####
-
-    # empty_world_launch = IncludeLaunchDescription(
-    # PathJoinSubstitution([FindPackageShare('ros_gz_sim'), 'launch', 'gz_sim.launch.py']),
-    # launch_arguments={
-    #     'pause': 'true',
-    #     'gz_args': ['-r ', 'empty.sdf'],
-    # }.items(),
-    # )
-
-
-    # iiwa_launch = IncludeLaunchDescription(
-    #     PathJoinSubstitution(
-    #         [FindPackageShare('iiwa_bringup'), 'launch', 'iiwa.launch.py']),
-    #      launch_arguments={
-    #     #     'gui': LaunchConfiguration('gui'),
-    #          'pause': 'true',
-    #         'gz_args': ['-r ', 'empty.sdf'],
-    #     }.items(),
-    # )
-
-    # # push robot_description to factory and spawn robot in gazebo
-    # urdf_spawner_node = Node(
-    #     package='ros_gz_sim',
-    #     executable='create',
-    #     name='urdf_spawner',
-    #     arguments=['-topic', '/robot_description', '-entity', 'iiwa', '-z', '0', '-unpause'],
-    #     output='screen',
-    # )
-
     #### Nodes ####
 
     ros2_kdl_node = Node(
         package='ros2_kdl_package',
         executable='ros2_kdl_node',
         output='screen',
-        parameters=[{'cmd_interface': ctrl}],
-        condition=IfCondition(PythonExpression(["'", node, "' == 'server'"]))
+        parameters=[params, {'cmd_interface': cmd}, {"ctrl" : ctrl}],
+        condition=IfCondition(
+            PythonExpression([
+                "'", node, "' == 'server'",
+            ])
+        )
     )
 
     ros2_kdl_client_node = Node(
@@ -85,9 +66,7 @@ def generate_launch_description():
     return LaunchDescription([
         node_to_start,
         cmd_interface,
-        # iiwa_launch,
-        # empty_world_launch,
+        controller_arg,
         ros2_kdl_node,
         ros2_kdl_client_node,
-        # urdf_spawner_node
     ])

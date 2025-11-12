@@ -4,6 +4,7 @@
 #include "Eigen/Dense"
 #include "kdl_robot.h"
 #include "utils.h"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 class KDLController
 {
@@ -18,12 +19,16 @@ public:
                            double _Kp,
                            double _Kd);
 
-    Eigen::VectorXd velocity_control_null(KDL::Frame &_desPos,
-                        //    KDL::Twist &_desVel,
-                        //    KDL::Twist &_desAcc,
-                           double _Kpp);
+    Eigen::VectorXd velocity_control_null(KDL::Frame &_desPos, double _Kpp);
+
+    Eigen::VectorXd vision_control (geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
+                                    KDL::Chain chain_,
+                                    Eigen::MatrixXd K);
 
 private:
+    Eigen::VectorXd compute_q0_dot(KDL::Frame &_desPos);
+                                                    
+    Eigen::MatrixXd compute_J_cam(KDL::Chain chain_);
 
     KDLRobot* robot_;
 

@@ -32,6 +32,20 @@ inline KDL::Frame toKDL(const std::vector<double>& v)
                       KDL::Vector(v.at(0),v.at(1),v.at(2)));
 }
 
+// Additional
+#include <geometry_msgs/msg/pose.hpp>
+inline KDL::Frame toKDL(const geometry_msgs::msg::Pose &pose)
+{
+    KDL::Vector p(pose.position.x, pose.position.y, pose.position.z);
+    KDL::Rotation R = KDL::Rotation::Quaternion(
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+        pose.orientation.w
+    );
+    return KDL::Frame(R, p);
+}
+
 inline Eigen::MatrixXd toEigen(const std::vector<Eigen::Matrix<double,3,7>>& J)
 {
     Eigen::Matrix<double,12,7> Ja;

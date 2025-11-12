@@ -411,11 +411,11 @@ def generate_launch_description():
 
     aruco_node = Node(
         package='aruco_ros',
-        executable='single',  # o 'multi' o il nome del nodo che vuoi lanciare
+        executable='single', 
         name='aruco_node',
         output='screen',
         parameters=[{
-            'marker_size': 0.1,  # 5 cm, ad esempio
+            'marker_size': 0.1, 
             'marker_id': 25,
             'reference_frame': 'camera_link',
             'marker_frame': 'aruco_marker',
