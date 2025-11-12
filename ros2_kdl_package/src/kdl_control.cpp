@@ -169,9 +169,9 @@ Eigen::VectorXd KDLController::vision_control(geometry_msgs::msg::PoseStamped::C
 
     // s
     Eigen::Vector3d s(0,0,1);
-    // if (p_norm > 1e-6) {
-    //     s = _P_c_o / p_norm;
-    // }
+    if (p_norm > 1e-6) {
+        s = _P_c_o / p_norm;
+    }
 
     // J_cam
     Eigen::MatrixXd J_cam = compute_J_cam(chain_);
@@ -218,5 +218,7 @@ Eigen::VectorXd KDLController::vision_control(geometry_msgs::msg::PoseStamped::C
     Eigen::VectorXd q_dot;
     q_dot = K*pseudoinverse*s_d + N*q0_dot;
     // std::cout << "q_dot = " << q_dot << std::endl;
-    return q_dot;
+
+    std::cout << "direction error = " << s-s_d << std::endl;
+    return -q_dot;
 }
