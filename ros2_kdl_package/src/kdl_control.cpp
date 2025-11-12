@@ -1,5 +1,5 @@
 #include "kdl_control.h"
-#include "utils.h"
+#include "utils.h" // Per l'uso della funzione skew()
 
 
 KDLController::KDLController(KDLRobot &_robot)
@@ -79,7 +79,7 @@ Eigen::VectorXd KDLController::compute_q0_dot(KDL::Frame &_desPos)
 {
     // Stato
     Eigen::VectorXd q = robot_->getJntValues();      // n×1
-    const int n = q.size();
+    const int n = robot_->getNrJnts();
 
     //Errore di posizione (solo traslazione)
     KDL::Frame cartpos = robot_->getEEFrame();
@@ -137,8 +137,8 @@ Eigen::MatrixXd KDLController::compute_J_cam(KDL::Chain chain_)
 
     KDL::Frame T_cam_ee = T_ee_cam.Inverse();
 
-    J_cam.changeBase(T_cam_ee.M);
-    //KDL::changeBase(J_cam, T_ee_cam.M);
+    J_cam.changeRefPoint(T_cam_ee.p);
+    // J_cam.changeBase(T_cam_ee.M);
 
     Eigen::MatrixXd J_c = J_cam.data;
 
@@ -146,50 +146,42 @@ Eigen::MatrixXd KDLController::compute_J_cam(KDL::Chain chain_)
 }
 
 
-Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
-                                                geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
+Eigen::VectorXd KDLController::vision_control(geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
                                                 KDL::Chain chain_,
                                                 Eigen::MatrixXd K)
 {
     // Numero di giunti
-    Eigen::VectorXd q = robot_->getJntValues();      // n×1
-    const int n = q.size();
+    const int n = robot_->getNrJnts();
 
-    // s_d
+    // s_d = [0, 0, 1]
     Eigen::Vector3d s_d {0, 0, 1};
-
-    // q0_dot
-    Eigen::VectorXd q0_dot = compute_q0_dot(_desPos);
 
     // P_c_o
     KDL::Frame aruco_frame = toKDL(aruco_msg->pose);
-    Eigen::Vector3d _P_c_o(aruco_frame.p[0], aruco_frame.p[1], aruco_frame.p[2]);
+    Eigen::Vector3d _P_c_o(aruco_frame.p.x(), aruco_frame.p.y(), aruco_frame.p.z());
     // R_c
     KDL::Rotation R_c= aruco_frame.M;
 
     // ||P||
     double p_norm = (double)_P_c_o.norm();
+    p_norm = std::max(p_norm, 1e-3);
     // std::cout << "p_norm = " << p_norm << std::endl;
 
     // s
     Eigen::Vector3d s(0,0,1);
-    if (p_norm > 1e-6) {
-        s = _P_c_o / p_norm;
-    }
+    // if (p_norm > 1e-6) {
+    //     s = _P_c_o / p_norm;
+    // }
 
     // J_cam
     Eigen::MatrixXd J_cam = compute_J_cam(chain_);
 
     // S(s)
     Eigen::Matrix3d S = skew(s);
-        // {{0, -s(2), s(1)},
-        //  {s(2), 0, -s(0)},
-        //  {-s(1), s(0), 0}};
     // std::cout << "S = " << S << std::endl;
 
     // R
-    // Supponiamo R sia una Matrix3d
-    Eigen::Matrix3d R_c_eigen;  // 3x3 rotation matrix
+    Eigen::Matrix3d R_c_eigen;  // ToEigen
 
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
@@ -197,14 +189,12 @@ Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
         }
     }
 
-    // Costruisci matrice 6x6: [R^T, 0; 0, R^T]
+    // R Construction
     Eigen::Matrix<double, 6, 6> R;
     R.setZero();  // Inizializza a zero
 
     R.block<3, 3>(0, 0) = R_c_eigen.transpose();  // Blocco alto-sinistra
     R.block<3, 3>(3, 3) = R_c_eigen.transpose();  // Blocco basso-destra
-
-    // std::cout << "R = " << R << std::endl;
 
     // L
     Eigen::Matrix<double, 3, 6> L;
@@ -215,13 +205,15 @@ Eigen::VectorXd KDLController::vision_control(KDL::Frame &_desPos,
     L = L*R;
     // std::cout << "L = " << L << std::endl;
 
-    double lambda = 0.01;
+    double lambda = 0.01; // damping pseudoinverse
     Eigen::MatrixXd pseudoinverse = (L*J_cam).transpose()*((L*J_cam)*(L*J_cam).transpose() + lambda*Eigen::MatrixXd::Identity(3,3)).inverse();
 
     // N
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(n, n) -  pseudoinverse*L*J_cam;
     // std::cout << "N = " << N << std::endl;
 
+    // q0_dot
+    Eigen::VectorXd q0_dot = compute_q0_dot(aruco_frame);
 
     Eigen::VectorXd q_dot;
     q_dot = K*pseudoinverse*s_d + N*q0_dot;

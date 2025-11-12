@@ -21,10 +21,9 @@ public:
 
     Eigen::VectorXd velocity_control_null(KDL::Frame &_desPos, double _Kpp);
 
-    Eigen::VectorXd vision_control (KDL::Frame &_desPos,
-                                                geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
-                                                KDL::Chain chain_,
-                                                Eigen::MatrixXd K);
+    Eigen::VectorXd vision_control (geometry_msgs::msg::PoseStamped::ConstSharedPtr aruco_msg,
+                                    KDL::Chain chain_,
+                                    Eigen::MatrixXd K);
 
 private:
     Eigen::VectorXd compute_q0_dot(KDL::Frame &_desPos);

@@ -141,12 +141,12 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             aruco_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
                 "/aruco_node/pose", 
-                100, 
+                300, 
                 std::bind(&Iiwa_pub_sub::aruco_callback, this, std::placeholders::_1));
 
             // Wait for the aruco pose topic
             while(!aruco_state_avaliable_){
-                RCLCPP_INFO(this->get_logger(), "No aruco data received yet! ...");
+                RCLCPP_INFO(this->get_logger(), "No aruco tag detected yet! ...");
                 rclcpp::spin_some(node_handle_);
             }
 
@@ -190,8 +190,6 @@ class Iiwa_pub_sub : public rclcpp::Node
             else if((cmd_interface_ == "velocity")  && (ctrl_ == "velocity_ctrl" || ctrl_ == "velocity_ctrl_null")){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
-                // timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
-                //                             std::bind(&Iiwa_pub_sub::cmd_publisher, this));
             
                 // Set joint velocity commands
                 for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
@@ -199,16 +197,6 @@ class Iiwa_pub_sub : public rclcpp::Node
                 }
             }
             else if((cmd_interface_ == "velocity")  && (ctrl_ == "vision_ctrl")){
-                // declare traj_type parameter
-                declare_parameter("traj_duration", 5.0);
-                get_parameter("traj_duration", traj_duration);
-                RCLCPP_INFO(get_logger(),"Current trajectory duration is: '%f'", traj_duration);
-
-                // declare  parameter 
-                declare_parameter("acc_duration", 1.0);
-                get_parameter("acc_duration", acc_duration);
-                RCLCPP_INFO(get_logger(),"Current acceleration duration is: '%f'", acc_duration);
-
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/velocity_controller/commands", 10);
                 timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
@@ -222,8 +210,6 @@ class Iiwa_pub_sub : public rclcpp::Node
             else if(cmd_interface_ == "effort"){
                 // Create cmd publisher
                 cmdPublisher_ = this->create_publisher<FloatArray>("/effort_controller/commands", 10);
-                // timer_ = this->create_wall_timer(std::chrono::milliseconds(100), 
-                //                             std::bind(&Iiwa_pub_sub::cmd_publisher, this));
             
                 // Set joint effort commands
                 for (long int i = 0; i < joint_efforts_cmd_.data.size(); ++i) {
@@ -241,6 +227,7 @@ class Iiwa_pub_sub : public rclcpp::Node
 
     private:
         rclcpp_action::Server<ExecuteLinearTrajectory>::SharedPtr action_server_;
+
 
         rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid,
                                                 std::shared_ptr<const ExecuteLinearTrajectory::Goal> goal)
@@ -269,11 +256,10 @@ class Iiwa_pub_sub : public rclcpp::Node
                                             goal->end_position[0],
                                             goal->end_position[1],
                                             goal->end_position[2]);
-
-
             (void)uuid; 
             return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
         }
+
 
         rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleTraj> goal_handle)
         {
@@ -282,12 +268,14 @@ class Iiwa_pub_sub : public rclcpp::Node
             return rclcpp_action::CancelResponse::ACCEPT;
         }
 
+
         void handle_accepted(const std::shared_ptr<GoalHandleTraj> goal_handle)
         {
             using namespace std::placeholders;
             // this needs to return quickly to avoid blocking the executor, so spin up a new thread
             std::thread{std::bind(&Iiwa_pub_sub::cmd_publisher, this, _1), goal_handle}.detach();
         }
+
 
         void cmd_publisher(const std::shared_ptr<GoalHandleTraj> goal_handle){
             iteration_ = iteration_ + 1;
@@ -496,27 +484,6 @@ class Iiwa_pub_sub : public rclcpp::Node
 
 
 
-        Eigen::Matrix4d T_camera_image_from_fov(double hfov, int width, int height)
-        {
-            const double fx = static_cast<double>(width) / (2.0 * std::tan(hfov / 2.0));
-            const double vfov = 2.0 * std::atan((double)height / (double)width * std::tan(hfov / 2.0));
-            const double fy = static_cast<double>(height) / (2.0 * std::tan(vfov / 2.0));
-            const double cx = width  / 2.0;
-            const double cy = height / 2.0;
-
-            Eigen::Matrix4d Tci = Eigen::Matrix4d::Identity();
-            Tci(0,0) = 1.0/fx;   Tci(0,2) = -cx/fx;
-            Tci(1,1) = 1.0/fy;   Tci(1,2) = -cy/fy;
-
-            return Tci; // camera <- image
-        }
-
-
-
-
-
-
-
         void cmd_publisher_vision(){
             iteration_ = iteration_ + 1;
 
@@ -524,22 +491,9 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // RCLCPP_INFO(this->get_logger(), "Executing %s", ctrl_.c_str());
 
-            // --- dopo aver ottenuto 'tag_pose' ---
-            // PRIMA di usare la posa del tag:
-            geometry_msgs::msg::PoseStamped tag_cam =
-            tf_buffer_.transform(tag_pose, "camera_optical_frame", tf2::durationFromSec(0.05));
-            
-            Eigen::Vector3d cPo(tag_cam.pose.position.x,
-                                tag_cam.pose.position.y,
-                                tag_cam.pose.position.z);
-            if (cPo.norm() < 1e-6) return;
-            
-            Eigen::Matrix3d Rc = Eigen::Matrix3d::Identity();
-            
-            // poi: calcolo J_ee, vision_ctrl(q, cPo, Rc, J_ee), publish qdot ...
-
-            // Calcola matrice da aruco a image Plane
+            // Calcola matrice di trasformazione da aruco a image Plane
             KDL::Frame T_imgP_aruco = toKDL(aruco_msg->pose);
+            std::cout << "Frame id = " << aruco_msg->header.frame_id << std::endl;
 
             // matrice di trasformazione da image Plane a camera di tipo Eigen
             double focal_length = 1.047;
@@ -563,69 +517,62 @@ class Iiwa_pub_sub : public rclcpp::Node
                 p_c_i
             );
 
-            // Matrix the camera wrt ee
+            // Matrix of the camera wrt ee
             KDL::Frame T_ee_cam = KDL::Frame(
                 KDL::Rotation::RPY(3.14, -1.57, 0.0),
                 KDL::Vector(0.0, 0.0, 0.17)
             );
-
-            // current_aruco_pose_ = T_cam_imgP*T_imgP_aruco;
-            // current_aruco_pose_ = Eigen::Vector3d(
-            //     T_cam_aruco.p.x(),
-            //     T_cam_aruco.p.y(),
-            //     T_cam_aruco.p.z()
-            // );
-
-            current_aruco_frame_ee = T_ee_cam*T_cam_imgP*T_imgP_aruco;
-            // current_aruco_position_ee = Eigen::Vector3d(
-            //     T_ee_aruco.p.x(),
-            //     T_ee_aruco.p.y(),
-            //     T_ee_aruco.p.z()
-            // );
-
-            // EE's trajectory initial position (just an offset)
-            Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data));
-
-            // EE's trajectory end position (just opposite y). Taken by yaml file
-            Eigen::Vector3d end_position_; 
-            end_position_ << current_aruco_frame_ee.p.data[0], current_aruco_frame_ee.p.data[1], current_aruco_frame_ee.p.data[2];
-
-            // Plan trajectory
-            double traj_radius = 0.15;
-            // Retrieve the first trajectory point
-            if(traj_type_ == "linear"){
-                planner_ = KDLPlanner(traj_duration, acc_duration, init_position, end_position_); // currently using trapezoidal velocity profile
-                if(s_type_ == "trapezoidal")
-                {
-                    p_ = planner_.linear_traj_trapezoidal(t_);
-                }else if(s_type_ == "cubic")
-                {
-                    p_ = planner_.linear_traj_cubic(t_);
-                }
-            } 
-            else if(traj_type_ == "circular")
-            {
-                planner_ = KDLPlanner(traj_duration, init_position, traj_radius, acc_duration);
-                if(s_type_ == "trapezoidal")
-                {
-                    p_ = planner_.circular_traj_trapezoidal(t_);
-                }else if(s_type_ == "cubic")
-                {
-                    p_ = planner_.circular_traj_cubic(t_);
-                }
-            }
+            // pose and orientation of the aruco wrt ee
+            current_aruco_frame_ee = T_ee_cam*T_imgP_aruco; // <-- Transformation in ee base
 
             // Compute EE frame
             KDL::Frame cartpos = robot_->getEEFrame(); 
 
-            // Compute desired Frame
-            KDL::Frame desFrame; 
-            desFrame.M = cartpos.M; 
-            desFrame.p = toKDL(p_.pos); 
+            // Compute desired Frame (aruco wrt base)
+            KDL::Frame desFrame = cartpos*current_aruco_frame_ee; 
+            // desFrame.M = cartpos.M; 
+            // desFrame.p = toKDL(p_.pos); 
+
+            // EE's trajectory initial position
+            // Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data));
+
+            // EE's trajectory end position: arucotag
+            Eigen::Vector3d end_position_(desFrame.p.data); // -0.88, -0.450, 0.40
+            // end_position_ << desFrame.p.data[0], desFrame.p.data[1], desFrame.p.data[2];
+            
+            std::cout << "end_position = " << end_position_ << std::endl;
+
+            // // Plan trajectory
+            // double traj_radius = 0.15;
+            // // Retrieve the first trajectory point
+            // if(traj_type_ == "linear"){
+            //     planner_ = KDLPlanner(traj_duration, acc_duration, init_position, end_position_); // currently using trapezoidal velocity profile
+            //     if(s_type_ == "trapezoidal")
+            //     {
+            //         p_ = planner_.linear_traj_trapezoidal(t_);
+            //     }else if(s_type_ == "cubic")
+            //     {
+            //         p_ = planner_.linear_traj_cubic(t_);
+            //     }
+            // } 
+            // else if(traj_type_ == "circular")
+            // {
+            //     planner_ = KDLPlanner(traj_duration, init_position, traj_radius, acc_duration);
+            //     if(s_type_ == "trapezoidal")
+            //     {
+            //         p_ = planner_.circular_traj_trapezoidal(t_);
+            //     }else if(s_type_ == "cubic")
+            //     {
+            //         p_ = planner_.circular_traj_cubic(t_);
+            //     }
+            // }
 
             // compute errors
-            Eigen::Vector3d error = computeLinearError(p_.pos, Eigen::Vector3d(cartpos.p.data));
-            Eigen::Vector3d o_error = computeOrientationError(toEigen(init_cart_pose_.M), toEigen(cartpos.M));
+            // Eigen::Vector3d error = computeLinearError(p_.pos, Eigen::Vector3d(cartpos.p.data));
+            Eigen::Vector3d error = computeLinearError(
+                Eigen::Vector3d(desFrame.p.data), 
+                Eigen::Vector3d(cartpos.p.data));
+            // Eigen::Vector3d o_error = computeOrientationError(toEigen(init_cart_pose_.M), toEigen(cartpos.M));
             double p_err_norm = (double)error.norm();
             std::cout << "||e_p("<< t_ <<")|| = " << p_err_norm << std::endl;
             t_ ++;
@@ -642,6 +589,7 @@ class Iiwa_pub_sub : public rclcpp::Node
                 RCLCPP_INFO_ONCE(this->get_logger(), "Aruco tag followed successfully!");
             }
             else{
+                // std::cout << "Running vision control." << std::endl;
                 KDL::Chain chain_;
                 robot_tree.getChain(
                                     robot_tree.getRootSegment()->first,
@@ -650,16 +598,20 @@ class Iiwa_pub_sub : public rclcpp::Node
                                                     robot_tree.getSegments().end())
                                                 )->first,
                                     chain_);
+
                 unsigned int n = robot_->getNrJnts();
+
                 double K_gain = 1;
                 Eigen::MatrixXd K = Eigen::MatrixXd::Identity(n,n)*K_gain;
 
-                // std::cout << "Running vision control." << std::endl;
-
-                joint_velocities_cmd_.data = controller_.vision_control(desFrame, 
-                                                                        this->aruco_msg, 
+                joint_velocities_cmd_.data = controller_.vision_control(this->aruco_msg, 
                                                                         chain_,
                                                                         K);
+                double dt = 0.1; // dipende dal timer
+                for (int i = 0; i < joint_positions_.data.size(); ++i) {
+                    joint_positions_.data[i] += joint_velocities_cmd_.data[i] * dt;
+                    joint_velocities_.data[i] = joint_velocities_cmd_.data[i];
+                }
                 // Update KDLrobot structure
                 robot_->update(toStdVector(joint_positions_.data),toStdVector(joint_velocities_.data));
 
@@ -697,13 +649,34 @@ class Iiwa_pub_sub : public rclcpp::Node
                 aruco_msg = msg;
         }
 
+
+
+
+        Eigen::Matrix4d T_camera_image_from_fov(double hfov, int width, int height)
+        {
+            const double fx = static_cast<double>(width) / (2.0 * std::tan(hfov / 2.0));
+            const double vfov = 2.0 * std::atan((double)height / (double)width * std::tan(hfov / 2.0));
+            const double fy = static_cast<double>(height) / (2.0 * std::tan(vfov / 2.0));
+            const double cx = width  / 2.0;
+            const double cy = height / 2.0;
+
+            Eigen::Matrix4d Tci = Eigen::Matrix4d::Identity();
+            Tci(0,0) = 1.0/fx;   Tci(0,2) = -cx/fx;
+            Tci(1,1) = 1.0/fy;   Tci(1,2) = -cy/fy;
+
+            return Tci; // camera <- image
+        }
+
+
         // Attributes
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr jointSubscriber_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_sub_;
 
         rclcpp::Publisher<FloatArray>::SharedPtr cmdPublisher_;
+
         rclcpp::TimerBase::SharedPtr timer_; 
         rclcpp::TimerBase::SharedPtr subTimer_;
+
         rclcpp::Node::SharedPtr node_handle_;
 
         std::vector<double> desired_commands_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
