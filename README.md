@@ -104,3 +104,12 @@ In another terminal, launch the `ros2_kdl_node` with `ctrl:=vision_ctrl`:
 ```sh
 ros2 launch ros2_kdl_package ros2_kdl.launch.py cmd_interface:=velocity ctrl:=vision_ctrl
 ```
+
+### Moving the aruco tag
+In another terminal:
+```sh
+ros2 service call /world/nuovo/set_pose ros_gz_interfaces/srv/SetEntityPose "{
+  entity: {name: 'arucotag', id: 0, type: 2}, 
+  pose: {position: {x: -0.88, y: -0.40, z: 0.43}, orientation: {x: -0.59, y: 0.4, z: -.4, w: 0.58}}
+}"
+```

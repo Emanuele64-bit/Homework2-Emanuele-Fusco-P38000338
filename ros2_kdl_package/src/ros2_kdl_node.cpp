@@ -485,37 +485,42 @@ class Iiwa_pub_sub : public rclcpp::Node
 
 
         void cmd_publisher_vision(){
-            iteration_ = iteration_ + 1;
+            // Verifica che il messaggio ArUco sia valido
+            if (!aruco_msg) {
+                RCLCPP_WARN(this->get_logger(), "No ArUco message available!");
+                return;
+            }
+            std::cout << "Frame id = " << aruco_msg->header.frame_id << std::endl;
 
+            iteration_ = iteration_ + 1;
             KDLController controller_(*robot_);
 
             // RCLCPP_INFO(this->get_logger(), "Executing %s", ctrl_.c_str());
 
             // Calcola matrice di trasformazione da aruco a image Plane
             KDL::Frame T_imgP_aruco = toKDL(aruco_msg->pose);
-            std::cout << "Frame id = " << aruco_msg->header.frame_id << std::endl;
 
-            // matrice di trasformazione da image Plane a camera di tipo Eigen
-            double focal_length = 1.047;
-            double width = 320;
-            double height = 240;
-            Eigen::Matrix4d T_cam_imgP_eigen = T_camera_image_from_fov(focal_length, width, height);
+            // // matrice di trasformazione da image Plane a camera di tipo Eigen
+            // double focal_length = 1.047;
+            // double width = 320;
+            // double height = 240;
+            // Eigen::Matrix4d T_cam_imgP_eigen = T_camera_image_from_fov(focal_length, width, height);
 
-            // Conversione esplicita a KDL
-            Eigen::Matrix3d R_eigen = T_cam_imgP_eigen.block<3,3>(0,0);
-            KDL::Rotation R_c_i(
-                R_eigen(0,0), R_eigen(0,1), R_eigen(0,2),
-                R_eigen(1,0), R_eigen(1,1), R_eigen(1,2),
-                R_eigen(2,0), R_eigen(2,1), R_eigen(2,2)
-            );
-            // Vector position
-            Eigen::Vector3d p_eigen = T_cam_imgP_eigen.block<3,1>(0,3);
-            KDL::Vector p_c_i(p_eigen(0), p_eigen(1), p_eigen(2));
-            // Matrice KDL
-            KDL::Frame T_cam_imgP = KDL::Frame(
-                R_c_i,
-                p_c_i
-            );
+            // // Conversione esplicita a KDL
+            // Eigen::Matrix3d R_eigen = T_cam_imgP_eigen.block<3,3>(0,0);
+            // KDL::Rotation R_c_i(
+            //     R_eigen(0,0), R_eigen(0,1), R_eigen(0,2),
+            //     R_eigen(1,0), R_eigen(1,1), R_eigen(1,2),
+            //     R_eigen(2,0), R_eigen(2,1), R_eigen(2,2)
+            // );
+            // // Vector position
+            // Eigen::Vector3d p_eigen = T_cam_imgP_eigen.block<3,1>(0,3);
+            // KDL::Vector p_c_i(p_eigen(0), p_eigen(1), p_eigen(2));
+            // // Matrice KDL
+            // KDL::Frame T_cam_imgP = KDL::Frame(
+            //     R_c_i,
+            //     p_c_i
+            // );
 
             // Matrix of the camera wrt ee
             KDL::Frame T_ee_cam = KDL::Frame(
@@ -530,42 +535,12 @@ class Iiwa_pub_sub : public rclcpp::Node
 
             // Compute desired Frame (aruco wrt base)
             KDL::Frame desFrame = cartpos*current_aruco_frame_ee; 
-            // desFrame.M = cartpos.M; 
-            // desFrame.p = toKDL(p_.pos); 
-
-            // EE's trajectory initial position
-            // Eigen::Vector3d init_position(Eigen::Vector3d(init_cart_pose_.p.data));
 
             // EE's trajectory end position: arucotag
             Eigen::Vector3d end_position_(desFrame.p.data); // -0.88, -0.450, 0.40
             // end_position_ << desFrame.p.data[0], desFrame.p.data[1], desFrame.p.data[2];
             
             std::cout << "end_position = " << end_position_ << std::endl;
-
-            // // Plan trajectory
-            // double traj_radius = 0.15;
-            // // Retrieve the first trajectory point
-            // if(traj_type_ == "linear"){
-            //     planner_ = KDLPlanner(traj_duration, acc_duration, init_position, end_position_); // currently using trapezoidal velocity profile
-            //     if(s_type_ == "trapezoidal")
-            //     {
-            //         p_ = planner_.linear_traj_trapezoidal(t_);
-            //     }else if(s_type_ == "cubic")
-            //     {
-            //         p_ = planner_.linear_traj_cubic(t_);
-            //     }
-            // } 
-            // else if(traj_type_ == "circular")
-            // {
-            //     planner_ = KDLPlanner(traj_duration, init_position, traj_radius, acc_duration);
-            //     if(s_type_ == "trapezoidal")
-            //     {
-            //         p_ = planner_.circular_traj_trapezoidal(t_);
-            //     }else if(s_type_ == "cubic")
-            //     {
-            //         p_ = planner_.circular_traj_cubic(t_);
-            //     }
-            // }
 
             // compute errors
             // Eigen::Vector3d error = computeLinearError(p_.pos, Eigen::Vector3d(cartpos.p.data));
@@ -595,8 +570,8 @@ class Iiwa_pub_sub : public rclcpp::Node
                                     robot_tree.getRootSegment()->first,
                                     std::prev(
                                                 std::prev(
-                                                    robot_tree.getSegments().end())
-                                                )->first,
+                                                            robot_tree.getSegments().end())
+                                    )->first,
                                     chain_);
 
                 unsigned int n = robot_->getNrJnts();
@@ -607,17 +582,27 @@ class Iiwa_pub_sub : public rclcpp::Node
                 joint_velocities_cmd_.data = controller_.vision_control(this->aruco_msg, 
                                                                         chain_,
                                                                         K);
-                double dt = 0.1; // dipende dal timer
-                for (int i = 0; i < joint_positions_.data.size(); ++i) {
-                    joint_positions_.data[i] += joint_velocities_cmd_.data[i] * dt;
-                    joint_velocities_.data[i] = joint_velocities_cmd_.data[i];
-                }
+
+                // double dt = 0.1; // dipende dal timer
+                // for (int i = 0; i < joint_positions_.data.size(); ++i) {
+                //     joint_positions_.data[i] += joint_velocities_cmd_.data[i] * dt;
+                //     // joint_velocities_.data[i] = joint_velocities_cmd_.data[i];
+                // }
+
                 // Update KDLrobot structure
-                robot_->update(toStdVector(joint_positions_.data),toStdVector(joint_velocities_.data));
+                // robot_->update(toStdVector(joint_positions_.data),toStdVector(joint_velocities_.data));
 
                 // Set joint velocity commands
+                // double vel_max = 0.3;
                 for (long int i = 0; i < joint_velocities_.data.size(); ++i) {
-                    desired_commands_[i] = joint_velocities_cmd_(i);
+                    // if(joint_velocities_cmd_(i) < vel_max && joint_velocities_cmd_(i)>-vel_max)
+                        desired_commands_[i] = joint_velocities_cmd_(i);
+                    // else if(joint_velocities_cmd_(i) > vel_max){
+                    //     desired_commands_[i] = vel_max;
+                    // }
+                    // else if(joint_velocities_cmd_(i) < -vel_max){
+                    //     desired_commands_[i] = -vel_max;
+                    // }
                 }
 
             }// end else

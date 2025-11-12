@@ -405,9 +405,16 @@ def generate_launch_description():
             "/camera@sensor_msgs/msg/Image@gz.msgs.Image",
             "/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
             "--ros-args",
-            "-r", "/camera:=/videocamera"], # Remapping
+            "-r", "/camera:=/videocamera"], # Remapping of /camera
         output="screen"
     )
+
+    # bridge_srv = Node(
+    #     package="ros_ign_bridge",
+    #     executable="parameter_bridge",
+    #     arguments=["/world/nuovo/set_pose@srv:ros_gz_interfaces/srv/SetEntityPose@gz.msgs.Pose"],
+    #     output="screen"
+    # )
 
     aruco_node = Node(
         package='aruco_ros',

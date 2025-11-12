@@ -62,6 +62,17 @@ def generate_launch_description():
         condition=IfCondition(PythonExpression(["'", node, "' == 'client'"]))
     )
 
+    # Bridge per set_pose dell'aruco tag
+    bridge_srv =  Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='pose_bridge',
+            arguments=[
+                '/world/nuovo/set_pose@ros_gz_interfaces/srv/SetEntityPose'
+            ],
+            output='screen',
+    )
+
     # List of Arguments and Nodes
     return LaunchDescription([
         node_to_start,
@@ -69,4 +80,5 @@ def generate_launch_description():
         controller_arg,
         ros2_kdl_node,
         ros2_kdl_client_node,
+        bridge_srv
     ])

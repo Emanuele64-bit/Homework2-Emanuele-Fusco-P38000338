@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version='1.4'>
-  <world name='empty'>
+  <world name='nuovo'>
     <physics name='1ms' type='ignored'>
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
@@ -92,5 +92,6 @@
       </uri>
       <pose>-0.88, -0.450, 0.40 -1.57 0 -1.20</pose>
     </include>
+
   </world>
 </sdf>
