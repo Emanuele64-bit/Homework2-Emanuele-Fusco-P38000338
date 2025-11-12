@@ -1,11 +1,11 @@
 # Homework 2: Control your Robot
-:construction_worker: **Claudia Adamo**, *P38000---*
+:construction_worker: **Claudia Adamo**, *P38000357*
 
 :construction_worker: **Emanuele Fusco**, *P380000338*
 
 :construction_worker: **Giacomo Ricco**, *P380000354*
 
-:construction_worker: **Francesco Romano**, *P38000---*
+:construction_worker: **Francesco Romano**, *P38000363*
 
 ## :video_game: Kinematic Control
 Open a ROS 2 workspace in a terminal and build the needed packages:
